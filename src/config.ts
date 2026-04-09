@@ -57,20 +57,80 @@ export function loadConfig({ cwd }: LoadConfigOptions): HippoMemoryConfig {
 }
 
 function readConfigFile(cwd: string): Partial<HippoMemoryConfig> {
+	let raw: string;
 	try {
-		const raw = readFileSync(join(cwd, "hippo-memory.config.json"), "utf8");
-		return JSON.parse(raw) as Partial<HippoMemoryConfig>;
+		raw = readFileSync(join(cwd, "hippo-memory.config.json"), "utf8");
 	} catch {
 		return {};
 	}
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(raw);
+	} catch (err) {
+		process.stderr.write(
+			`[hippo-memory-pi] warning: hippo-memory.config.json is not valid JSON: ${
+				err instanceof Error ? err.message : String(err)
+			}\n`,
+		);
+		return {};
+	}
+	return sanitizeConfigFile(parsed);
 }
+
+// Strip fields whose runtime types don't match the declared HippoMemoryConfig
+// shape. A malformed config file should never poison later code that reads
+// typed fields (e.g., arithmetic on recallBudget).
+function sanitizeConfigFile(value: unknown): Partial<HippoMemoryConfig> {
+	if (value === null || typeof value !== "object") return {};
+	const input = value as Record<string, unknown>;
+	const out: Partial<HippoMemoryConfig> = {};
+
+	const boolKeys = [
+		"autoInject",
+		"autoCapture",
+		"autoOutcome",
+		"autoSleep",
+		"autoLearnGit",
+		"autoShare",
+	] as const;
+	for (const k of boolKeys) {
+		if (typeof input[k] === "boolean") out[k] = input[k] as boolean;
+	}
+
+	const intKeys = ["recallBudget", "recallLimit", "sleepThreshold"] as const;
+	for (const k of intKeys) {
+		const v = input[k];
+		if (typeof v === "number" && Number.isInteger(v) && v >= 0) out[k] = v;
+	}
+
+	const searchMode = input.searchMode;
+	if (searchMode === "bm25" || searchMode === "hybrid") out.searchMode = searchMode;
+
+	const framing = input.framing;
+	if (framing === "observe" || framing === "suggest" || framing === "assert") {
+		out.framing = framing;
+	}
+
+	if (typeof input.projectRoot === "string" && input.projectRoot.length > 0) {
+		out.projectRoot = input.projectRoot;
+	}
+	if (typeof input.globalRoot === "string" && input.globalRoot.length > 0) {
+		out.globalRoot = input.globalRoot;
+	}
+
+	return out;
+}
+
+const TRUTHY_BOOL_VALUES = new Set(["true", "1", "yes", "on"]);
+const FALSY_BOOL_VALUES = new Set(["false", "0", "no", "off"]);
 
 function applyEnvBool(target: HippoMemoryConfig, key: string, envName: string): void {
 	const val = process.env[envName];
 	if (val === undefined) return;
-	if (val === "true" || val === "1") {
+	const normalized = val.toLowerCase().trim();
+	if (TRUTHY_BOOL_VALUES.has(normalized)) {
 		(target as unknown as Record<string, unknown>)[key] = true;
-	} else if (val === "false" || val === "0") {
+	} else if (FALSY_BOOL_VALUES.has(normalized)) {
 		(target as unknown as Record<string, unknown>)[key] = false;
 	}
 }
@@ -78,8 +138,11 @@ function applyEnvBool(target: HippoMemoryConfig, key: string, envName: string): 
 function applyEnvInt(target: HippoMemoryConfig, key: string, envName: string): void {
 	const val = process.env[envName];
 	if (val === undefined) return;
-	const n = Number.parseInt(val, 10);
-	if (!Number.isNaN(n) && n >= 0) {
+	// Only accept strict non-negative integer strings. Rejects "1.5", "1000abc",
+	// "", " ", and leading/trailing whitespace.
+	if (!/^\d+$/.test(val)) return;
+	const n = Number(val);
+	if (Number.isInteger(n) && n >= 0) {
 		(target as unknown as Record<string, unknown>)[key] = n;
 	}
 }
