@@ -1,5 +1,11 @@
 import { mkdirSync } from "node:fs";
 import {
+	type ConsolidationResult as HippoConsolidationResult,
+	type WorkingMemoryItem as HippoWorkingMemoryItem,
+	Layer,
+	type MatchExplanation,
+	type MemoryEntry,
+	type SearchResult,
 	applyOutcome,
 	autoShare,
 	consolidate,
@@ -9,6 +15,8 @@ import {
 	extractLessons,
 	fetchGitLog,
 	resolveConflict as hippoResolveConflict,
+	wmPush as hippoWmPush,
+	wmRead as hippoWmRead,
 	hybridSearch,
 	initStore,
 	listMemoryConflicts,
@@ -18,10 +26,25 @@ import {
 	readEntry,
 	search,
 	wmFlush,
-	wmPush,
-	wmRead,
 	writeEntry,
 } from "hippo-memory";
+
+/**
+ * Shape of a single row returned by `listMemoryConflicts`. hippo-memory
+ * defines this type in its internal store module but does not re-export it
+ * from the package root, so we mirror the relevant subset here. Verified
+ * against hippo@0.19.0's `MemoryConflict` interface.
+ */
+interface HippoConflictRow {
+	id: number;
+	memory_a_id: string;
+	memory_b_id: string;
+	reason: string;
+	score: number;
+	status: string;
+	detected_at: string;
+	updated_at: string;
+}
 import type { HippoMemoryConfig } from "./config";
 import type { MemoryService } from "./memory-service";
 import { Mutex } from "./mutex";
@@ -49,20 +72,20 @@ import type {
 	WorkingMemoryItem,
 } from "./types";
 
-type HippoEntry = Record<string, unknown>;
-
-// Shape of a single row returned by hippo-memory's `listMemoryConflicts`.
-// Verified against hippo@0.19.0 schema: the SQLite columns are
-// `id INTEGER PRIMARY KEY`, `memory_a_id`, `memory_b_id`, `reason`, `score`,
-// `status`, `detected_at`, `updated_at`. We only use a subset here.
-interface HippoConflictRow {
-	id: number;
-	memory_a_id: string;
-	memory_b_id: string;
-	reason: string;
-	score: number;
-	status: "open" | "resolved";
-	detected_at: string;
+/**
+ * Convert hippo's `Layer` enum value (runtime: string "buffer"/"episodic"/
+ * "semantic") to our domain-facing `MemoryLayer` literal union. A switch is
+ * used instead of a cast so TypeScript verifies the mapping exhaustively.
+ */
+function layerToDomain(layer: Layer): MemoryLayer {
+	switch (layer) {
+		case Layer.Buffer:
+			return "buffer";
+		case Layer.Episodic:
+			return "episodic";
+		case Layer.Semantic:
+			return "semantic";
+	}
 }
 
 export class HippoMemoryService implements MemoryService {
@@ -93,14 +116,14 @@ export class HippoMemoryService implements MemoryService {
 		// Project root: hard failure if we can't open it.
 		this.projectRoot = this.config.projectRoot;
 		mkdirSync(this.projectRoot, { recursive: true });
-		await initStore(this.projectRoot);
+		initStore(this.projectRoot);
 
 		// Global root: soft failure — if we can't write to it (permissions,
 		// read-only volume, etc.) we fall back to project-only mode instead
 		// of blocking the whole extension.
 		try {
 			mkdirSync(this.config.globalRoot, { recursive: true });
-			await initStore(this.config.globalRoot);
+			initStore(this.config.globalRoot);
 			this.globalRoot = this.config.globalRoot;
 		} catch {
 			this.globalRoot = null;
@@ -138,7 +161,7 @@ export class HippoMemoryService implements MemoryService {
 			tags.push("error");
 		}
 
-		// Explicit override of hippo's "verified" default.
+		// Explicit override of hippo's "verified" default for plain observations.
 		const confidence: ConfidenceLevel = input.kind ?? "observed";
 
 		const createOpts: Parameters<typeof createMemory>[1] = {
@@ -153,16 +176,20 @@ export class HippoMemoryService implements MemoryService {
 
 		const useGlobal = input.global === true && this.getGlobalRoot() !== null;
 		const root: MemoryRoot = useGlobal ? "global" : "project";
-		const hippoRoot = useGlobal ? (this.getGlobalRoot() as string) : this.requireProjectRoot();
+		// useGlobal already checked getGlobalRoot() !== null so the non-null
+		// assertion below is safe but we avoid `!` by re-reading and falling
+		// back to project if somehow racy.
+		const globalRoot = this.getGlobalRoot();
+		const hippoRoot = useGlobal && globalRoot ? globalRoot : this.requireProjectRoot();
 
-		const entry = createMemory(input.content, createOpts) as unknown as HippoEntry;
+		const entry = createMemory(input.content, createOpts);
 		if (input.pin === true) {
 			entry.pinned = true;
 			entry.half_life_days = Number.POSITIVE_INFINITY;
 		}
 
 		await this.withWrite(async () => {
-			await writeEntry(hippoRoot, entry as never);
+			writeEntry(hippoRoot, entry);
 		});
 		this.newMemoriesCount++;
 
@@ -180,11 +207,11 @@ export class HippoMemoryService implements MemoryService {
 				confidence: "observed",
 				emotional_valence: "negative",
 				baseHalfLifeDays: 14,
-			}) as unknown as HippoEntry;
+			});
 
 			const hippoRoot = this.requireProjectRoot();
 			await this.withWrite(async () => {
-				await writeEntry(hippoRoot, entry as never);
+				writeEntry(hippoRoot, entry);
 			});
 			this.newMemoriesCount++;
 			return this.toView(entry, "project");
@@ -204,7 +231,7 @@ export class HippoMemoryService implements MemoryService {
 			source: "pi:decide",
 			confidence: "verified",
 			baseHalfLifeDays: 90,
-		}) as unknown as HippoEntry;
+		});
 
 		if (input.supersedes) {
 			entry.conflicts_with = [input.supersedes];
@@ -212,7 +239,7 @@ export class HippoMemoryService implements MemoryService {
 
 		const hippoRoot = this.requireProjectRoot();
 		await this.withWrite(async () => {
-			await writeEntry(hippoRoot, entry as never);
+			writeEntry(hippoRoot, entry);
 		});
 		this.newMemoriesCount++;
 
@@ -229,27 +256,18 @@ export class HippoMemoryService implements MemoryService {
 		const scope = opts.scope ?? "both";
 		const mode = this.config.searchMode;
 
-		type RawHit = {
-			entry: HippoEntry;
-			score: number;
-			bm25: number;
-			cosine: number;
+		interface RawHit {
+			result: SearchResult;
 			root: MemoryRoot;
-		};
+		}
 
 		const runSearch = async (root: string, rootLabel: MemoryRoot): Promise<RawHit[]> => {
-			const entries = (await loadAllEntries(root)) as unknown as HippoEntry[];
+			const entries = loadAllEntries(root);
 			const raw =
 				mode === "hybrid"
-					? await hybridSearch(query, entries as never, { budget })
-					: search(query, entries as never, { budget });
-			return (raw as unknown as Array<Record<string, unknown>>).map((h) => ({
-				entry: h.entry as HippoEntry,
-				score: (h.score as number) ?? 0,
-				bm25: (h.bm25 as number) ?? 0,
-				cosine: (h.cosine as number) ?? 0,
-				root: rootLabel,
-			}));
+					? await hybridSearch(query, entries, { budget })
+					: search(query, entries, { budget });
+			return raw.map((result) => ({ result, root: rootLabel }));
 		};
 
 		let hits: RawHit[] = [];
@@ -262,35 +280,33 @@ export class HippoMemoryService implements MemoryService {
 			}
 		}
 
-		hits.sort((a, b) => b.score - a.score);
+		hits.sort((a, b) => b.result.score - a.result.score);
 		hits = hits.slice(0, limit);
 
 		// Retrieval side-effect: bump retrieval_count and last_retrieved.
-		// markRetrieved returns NEW entries (it does not mutate in place
-		// despite the .d.ts comment). Persist the returned copies via writeEntry.
+		// markRetrieved returns NEW entries (does not mutate in place despite
+		// the .d.ts description). Persist the returned copies via writeEntry.
 		if (hits.length > 0) {
 			await this.withWrite(async () => {
 				const now = new Date();
-				const byRoot = new Map<string, HippoEntry[]>();
-				for (const h of hits) {
-					const r = h.root === "global" ? (globalRoot as string) : project;
-					const arr = byRoot.get(r) ?? [];
-					arr.push(h.entry);
-					byRoot.set(r, arr);
-				}
-				for (const [root, entries] of byRoot) {
-					const updated = markRetrieved(entries as never, now) as unknown as HippoEntry[];
-					// Replace the `entry` reference on each hit with the updated copy
-					// so toView sees the bumped retrieval_count/last_retrieved.
-					for (let i = 0; i < updated.length; i++) {
-						const before = entries[i];
-						const after = updated[i];
-						if (!after) continue;
-						for (const h of hits) {
-							if (h.entry === before) h.entry = after;
-						}
+				const byRoot = new Map<string, { entries: MemoryEntry[]; indexes: number[] }>();
+				hits.forEach((h, i) => {
+					const r = h.root === "global" && globalRoot ? globalRoot : project;
+					const bucket = byRoot.get(r) ?? { entries: [], indexes: [] };
+					bucket.entries.push(h.result.entry);
+					bucket.indexes.push(i);
+					byRoot.set(r, bucket);
+				});
+				for (const [root, { entries, indexes }] of byRoot) {
+					const updated = markRetrieved(entries, now);
+					for (let j = 0; j < updated.length; j++) {
+						const after = updated[j];
+						const hitIndex = indexes[j];
+						if (!after || hitIndex === undefined) continue;
+						const hit = hits[hitIndex];
+						if (hit) hit.result = { ...hit.result, entry: after };
 						try {
-							await writeEntry(root, after as never);
+							writeEntry(root, after);
 						} catch {
 							// best-effort: don't fail recall if the write-back fails
 						}
@@ -301,22 +317,12 @@ export class HippoMemoryService implements MemoryService {
 
 		// Build RecallResult
 		const results: RecallHit[] = hits.map((h) => {
-			const view = this.toView(h.entry, h.root);
-			const base: RecallHit = { entry: view, score: h.score };
+			const view = this.toView(h.result.entry, h.root);
+			const base: RecallHit = { entry: view, score: h.result.score };
 			if (opts.why) {
 				try {
-					const explanation = explainMatch(query, {
-						entry: h.entry,
-						score: h.score,
-						bm25: h.bm25,
-						cosine: h.cosine,
-						tokens: Math.ceil((view.content.length ?? 0) / 4),
-					} as never);
-					const reason =
-						typeof explanation === "string"
-							? explanation
-							: ((explanation as { reason?: string } | null)?.reason ?? "");
-					if (reason) base.explanation = reason;
+					const explanation: MatchExplanation = explainMatch(query, h.result);
+					if (explanation.reason) base.explanation = explanation.reason;
 				} catch {
 					// explanation is optional; swallow errors
 				}
@@ -365,7 +371,7 @@ export class HippoMemoryService implements MemoryService {
 		const globalRoot = this.getGlobalRoot();
 
 		try {
-			const local = (await readEntry(project, id)) as unknown as HippoEntry | null;
+			const local = readEntry(project, id);
 			if (local) return this.toView(local, "project");
 		} catch {
 			// fall through to global
@@ -373,7 +379,7 @@ export class HippoMemoryService implements MemoryService {
 
 		if (globalRoot) {
 			try {
-				const global = (await readEntry(globalRoot, id)) as unknown as HippoEntry | null;
+				const global = readEntry(globalRoot, id);
 				if (global) return this.toView(global, "global");
 			} catch {
 				// fall through
@@ -388,10 +394,7 @@ export class HippoMemoryService implements MemoryService {
 		// "all" sentinel returns zero rows. Callers that want both buckets must
 		// call this method twice. The interface still accepts "all" for
 		// forward-compat if hippo adds proper handling later.
-		const rows = (await listMemoryConflicts(
-			this.requireProjectRoot(),
-			status as never,
-		)) as unknown as Array<HippoConflictRow>;
+		const rows: HippoConflictRow[] = listMemoryConflicts(this.requireProjectRoot(), status);
 
 		return rows.map((row) => ({
 			id: String(row.id),
@@ -399,7 +402,9 @@ export class HippoMemoryService implements MemoryService {
 			second: row.memory_b_id,
 			overlap: row.score,
 			conflictType: row.reason,
-			status: row.status,
+			// hippo's MemoryConflict.status is typed `string`, but the schema
+			// only stores "open" or "resolved". Narrow explicitly.
+			status: row.status === "resolved" ? "resolved" : "open",
 			detectedAt: row.detected_at,
 		}));
 	}
@@ -410,11 +415,11 @@ export class HippoMemoryService implements MemoryService {
 		await this.withWrite(async () => {
 			const root = await this.findRootContaining(id);
 			if (!root) return;
-			const entry = (await readEntry(root, id)) as unknown as HippoEntry | null;
+			const entry = readEntry(root, id);
 			if (!entry) return;
 			// applyOutcome returns a NEW entry, does not mutate in place.
-			const updated = applyOutcome(entry as never, result === "good") as unknown as HippoEntry;
-			await writeEntry(root, updated as never);
+			const updated = applyOutcome(entry, result === "good");
+			writeEntry(root, updated);
 		});
 	}
 
@@ -422,13 +427,13 @@ export class HippoMemoryService implements MemoryService {
 		await this.withWrite(async () => {
 			const root = await this.findRootContaining(id);
 			if (!root) return;
-			const entry = (await readEntry(root, id)) as unknown as HippoEntry | null;
+			const entry = readEntry(root, id);
 			if (!entry) return;
 			entry.pinned = pinned;
 			if (pinned) {
 				entry.half_life_days = Number.POSITIVE_INFINITY;
 			}
-			await writeEntry(root, entry as never);
+			writeEntry(root, entry);
 		});
 	}
 
@@ -443,22 +448,21 @@ export class HippoMemoryService implements MemoryService {
 	async invalidate(pattern: string, reason?: string): Promise<number> {
 		return this.withWrite(async () => {
 			const project = this.requireProjectRoot();
-			const all = (await loadAllEntries(project)) as unknown as HippoEntry[];
+			const all: MemoryEntry[] = loadAllEntries(project);
 			const lower = pattern.toLowerCase();
 			const cap = 1000;
 			let weakened = 0;
 			for (const entry of all) {
 				if (weakened >= cap) break;
-				const content = String(entry.content ?? "").toLowerCase();
-				const tagsText = ((entry.tags as string[] | undefined) ?? []).join(" ").toLowerCase();
+				const content = entry.content.toLowerCase();
+				const tagsText = entry.tags.join(" ").toLowerCase();
 				if (content.includes(lower) || tagsText.includes(lower)) {
-					entry.strength = Math.max(0, (entry.strength as number) * 0.25);
-					entry.half_life_days = Math.max(0.5, (entry.half_life_days as number) * 0.5);
+					entry.strength = Math.max(0, entry.strength * 0.25);
+					entry.half_life_days = Math.max(0.5, entry.half_life_days * 0.5);
 					if (reason) {
-						const existing = (entry.tags as string[] | undefined) ?? [];
-						entry.tags = [...existing, `invalidated:${reason}`];
+						entry.tags = [...entry.tags, `invalidated:${reason}`];
 					}
-					await writeEntry(project, entry as never);
+					writeEntry(project, entry);
 					weakened++;
 				}
 			}
@@ -469,15 +473,19 @@ export class HippoMemoryService implements MemoryService {
 	async resolveConflict(conflictId: string, keep: "first" | "second"): Promise<void> {
 		await this.withWrite(async () => {
 			const root = this.requireProjectRoot();
-			// hippo's listMemoryConflicts only filters by exact status; "open" is the
-			// default and the only case we need to resolve from.
+			// hippo's listMemoryConflicts only returns open conflicts when the
+			// status is "open"; that's all we can resolve from.
 			const conflicts = await this.listConflicts("open");
 			const target = conflicts.find((c) => c.id === conflictId);
 			if (!target) throw new Error(`conflict ${conflictId} not found`);
 			const keepId = keep === "first" ? target.first : target.second;
 			if (!keepId) throw new Error(`conflict ${conflictId} has no ${keep} entry`);
-			// hippo accepts either string or number for conflictId via SQLite coercion.
-			hippoResolveConflict(root, conflictId as never, keepId, true);
+			// hippo stores the row id as a number; parse it back.
+			const numericId = Number.parseInt(conflictId, 10);
+			if (!Number.isFinite(numericId)) {
+				throw new Error(`conflict id ${conflictId} is not numeric`);
+			}
+			hippoResolveConflict(root, numericId, keepId, true);
 		});
 	}
 
@@ -487,17 +495,19 @@ export class HippoMemoryService implements MemoryService {
 		const started = Date.now();
 		const project = this.requireProjectRoot();
 
-		const raw = (await this.withWrite(async () => {
-			return consolidate(project, { dryRun: opts.dryRun === true });
-		})) as unknown as Record<string, unknown>;
+		const raw: HippoConsolidationResult = await this.withWrite(async () =>
+			consolidate(project, { dryRun: opts.dryRun === true }),
+		);
 
 		let promoted = 0;
 		// Only run autoShare on real (non-dry) sleep cycles, and only when the
 		// config enables it and a global store is available.
 		if (opts.dryRun !== true && this.config.autoShare && this.getGlobalRoot() !== null) {
 			try {
-				const shareResult = await this.withWrite(async () => autoShare(project, { dryRun: false }));
-				promoted = Array.isArray(shareResult) ? (shareResult as unknown[]).length : 0;
+				const shareResult: MemoryEntry[] = await this.withWrite(async () =>
+					autoShare(project, { dryRun: false }),
+				);
+				promoted = shareResult.length;
 			} catch {
 				// best-effort
 			}
@@ -511,8 +521,8 @@ export class HippoMemoryService implements MemoryService {
 		}
 
 		return {
-			decayed: (raw.decayed as number | undefined) ?? 0,
-			merged: (raw.merged as number | undefined) ?? 0,
+			decayed: raw.decayed,
+			merged: raw.merged,
 			conflicts: 0,
 			promoted,
 			durationMs: Date.now() - started,
@@ -522,18 +532,15 @@ export class HippoMemoryService implements MemoryService {
 	async status(): Promise<MemoryStatus> {
 		const project = this.requireProjectRoot();
 		const globalRoot = this.getGlobalRoot();
-		const projectEntries = (await loadAllEntries(project)) as unknown as HippoEntry[];
-		const globalEntries = globalRoot
-			? ((await loadAllEntries(globalRoot)) as unknown as HippoEntry[])
-			: [];
+		const projectEntries: MemoryEntry[] = loadAllEntries(project);
+		const globalEntries: MemoryEntry[] = globalRoot ? loadAllEntries(globalRoot) : [];
 
-		const episodic = projectEntries.filter((e) => e.layer === "episodic").length;
-		const semantic = projectEntries.filter((e) => e.layer === "semantic").length;
-		const buffer = projectEntries.filter((e) => e.layer === "buffer").length;
+		const episodic = projectEntries.filter((e) => e.layer === Layer.Episodic).length;
+		const semantic = projectEntries.filter((e) => e.layer === Layer.Semantic).length;
+		const buffer = projectEntries.filter((e) => e.layer === Layer.Buffer).length;
 		const averageStrength =
 			projectEntries.length > 0
-				? projectEntries.reduce((acc, e) => acc + ((e.strength as number | undefined) ?? 0), 0) /
-					projectEntries.length
+				? projectEntries.reduce((acc, e) => acc + e.strength, 0) / projectEntries.length
 				: 0;
 
 		return {
@@ -553,7 +560,7 @@ export class HippoMemoryService implements MemoryService {
 
 	async wmPush(item: WorkingMemoryItem): Promise<void> {
 		await this.withWrite(async () => {
-			wmPush(this.requireProjectRoot(), {
+			hippoWmPush(this.requireProjectRoot(), {
 				scope: item.scope,
 				content: item.content,
 				importance: item.importance ?? 1,
@@ -562,13 +569,11 @@ export class HippoMemoryService implements MemoryService {
 	}
 
 	async wmRead(scope: string): Promise<WorkingMemoryItem[]> {
-		const rows = wmRead(this.requireProjectRoot(), { scope }) as unknown as Array<
-			Record<string, unknown>
-		>;
+		const rows: HippoWorkingMemoryItem[] = hippoWmRead(this.requireProjectRoot(), { scope });
 		return rows.map((row) => ({
-			scope: row.scope as string,
-			content: row.content as string,
-			importance: (row.importance as number | undefined) ?? 1,
+			scope: row.scope,
+			content: row.content,
+			importance: row.importance,
 		}));
 	}
 
@@ -589,15 +594,10 @@ export class HippoMemoryService implements MemoryService {
 
 		if (idOrAuto === "auto") {
 			try {
-				const result = (await this.withWrite(async () =>
+				const result: MemoryEntry[] = await this.withWrite(async () =>
 					autoShare(project, { dryRun }),
-				)) as unknown;
-				// hippo's autoShare returns an array (candidates on dryRun, shared on real run).
-				const items = Array.isArray(result) ? (result as Array<Record<string, unknown>>) : [];
-				const promoted = items
-					.map((e) => e.id as string | undefined)
-					.filter((id): id is string => typeof id === "string");
-				return { promoted, skipped: [], dryRun };
+				);
+				return { promoted: result.map((e) => e.id), skipped: [], dryRun };
 			} catch {
 				return { promoted: [], skipped: [], dryRun };
 			}
@@ -619,14 +619,13 @@ export class HippoMemoryService implements MemoryService {
 		const globalRoot = this.getGlobalRoot();
 		if (!globalRoot) return { promoted: 0, considered: 0 };
 		try {
-			const result = (await this.withWrite(async () =>
+			const result: MemoryEntry[] = await this.withWrite(async () =>
 				autoShare(this.requireProjectRoot(), {}),
-			)) as unknown;
-			const promoted = Array.isArray(result) ? (result as unknown[]).length : 0;
+			);
 			// hippo's autoShare only returns the promoted array; we can't know the
 			// "considered" count without re-running the filter ourselves. Report
 			// promoted as both values for v1.
-			return { promoted, considered: promoted };
+			return { promoted: result.length, considered: result.length };
 		} catch {
 			return { promoted: 0, considered: 0 };
 		}
@@ -644,8 +643,8 @@ export class HippoMemoryService implements MemoryService {
 				try {
 					// hippo's fetchGitLog returns a raw newline-separated string
 					// (or "" on failure — it swallows errors internally).
-					const log = (await fetchGitLog(repo, days)) as unknown as string;
-					if (typeof log === "string" && log.length > 0) {
+					const log: string = fetchGitLog(repo, days);
+					if (log.length > 0) {
 						combinedLog = combinedLog.length > 0 ? `${combinedLog}\n${log}` : log;
 					}
 				} catch {
@@ -661,12 +660,11 @@ export class HippoMemoryService implements MemoryService {
 			}
 
 			// hippo's extractLessons returns an array of strings, not objects.
-			const lessons = (extractLessons(combinedLog as never) as unknown as unknown[]) ?? [];
+			const lessons: string[] = extractLessons(combinedLog);
 			let added = 0;
-			for (const lesson of lessons) {
+			for (const content of lessons) {
+				if (!content) continue;
 				try {
-					const content = typeof lesson === "string" ? lesson : String(lesson ?? "");
-					if (!content) continue;
 					await this.remember({
 						content,
 						tags: ["git-learn"],
@@ -693,13 +691,13 @@ export class HippoMemoryService implements MemoryService {
 		const project = this.requireProjectRoot();
 		const globalRoot = this.getGlobalRoot();
 		try {
-			if (await readEntry(project, id)) return project;
+			if (readEntry(project, id)) return project;
 		} catch {
 			// fall through
 		}
 		if (globalRoot) {
 			try {
-				if (await readEntry(globalRoot, id)) return globalRoot;
+				if (readEntry(globalRoot, id)) return globalRoot;
 			} catch {
 				// fall through
 			}
@@ -707,20 +705,32 @@ export class HippoMemoryService implements MemoryService {
 		return null;
 	}
 
-	private toView(entry: HippoEntry, root: MemoryRoot): MemoryEntryView {
+	/**
+	 * Map a hippo-memory MemoryEntry to our domain-facing MemoryEntryView.
+	 * This is the ONLY boundary where hippo's internal shape meets our public
+	 * types — every reader downstream uses MemoryEntryView exclusively.
+	 *
+	 * hippo's `EmotionalValence` and `ConfidenceLevel` are string literal
+	 * unions identical to ours, so direct assignment is type-safe.
+	 * `Layer` is a string enum, so we map it through `layerToDomain` to get a
+	 * checked narrowing into our `MemoryLayer` union.
+	 */
+	private toView(entry: MemoryEntry, root: MemoryRoot): MemoryEntryView {
+		const confidence: ConfidenceLevel = entry.confidence;
+		const emotionalValence: EmotionalValence = entry.emotional_valence;
 		return {
-			id: entry.id as string,
-			layer: entry.layer as MemoryLayer,
-			content: entry.content as string,
-			tags: (entry.tags as string[] | undefined) ?? [],
-			strength: entry.strength as number,
-			halfLifeDays: entry.half_life_days as number,
-			confidence: entry.confidence as ConfidenceLevel,
-			emotionalValence: entry.emotional_valence as EmotionalValence,
-			pinned: Boolean(entry.pinned),
-			retrievalCount: (entry.retrieval_count as number | undefined) ?? 0,
-			createdAt: entry.created as string,
-			lastRetrievedAt: entry.last_retrieved as string,
+			id: entry.id,
+			layer: layerToDomain(entry.layer),
+			content: entry.content,
+			tags: entry.tags,
+			strength: entry.strength,
+			halfLifeDays: entry.half_life_days,
+			confidence,
+			emotionalValence,
+			pinned: entry.pinned,
+			retrievalCount: entry.retrieval_count,
+			createdAt: entry.created,
+			lastRetrievedAt: entry.last_retrieved,
 			root,
 		};
 	}

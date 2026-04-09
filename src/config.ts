@@ -31,6 +31,20 @@ export const DEFAULT_CONFIG: HippoMemoryConfig = {
 	framing: "observe",
 };
 
+// Precise key unions for the env helpers — each helper only mutates fields of
+// the correct runtime type, so no casts are needed when assigning.
+type BoolKey = {
+	[K in keyof HippoMemoryConfig]-?: HippoMemoryConfig[K] extends boolean ? K : never;
+}[keyof HippoMemoryConfig];
+
+type IntKey = {
+	[K in keyof HippoMemoryConfig]-?: HippoMemoryConfig[K] extends number ? K : never;
+}[keyof HippoMemoryConfig];
+
+// Optional-string fields. Enumerated explicitly because mapped-type filtering
+// for `string | undefined` distributes unpredictably under exactOptionalPropertyTypes.
+type StringKey = "projectRoot" | "globalRoot";
+
 interface LoadConfigOptions {
 	cwd: string;
 }
@@ -79,25 +93,29 @@ function readConfigFile(cwd: string): Partial<HippoMemoryConfig> {
 
 // Strip fields whose runtime types don't match the declared HippoMemoryConfig
 // shape. A malformed config file should never poison later code that reads
-// typed fields (e.g., arithmetic on recallBudget).
+// typed fields (e.g., arithmetic on recallBudget). `value` comes from
+// JSON.parse (typed unknown), so we narrow with typeof guards.
 function sanitizeConfigFile(value: unknown): Partial<HippoMemoryConfig> {
 	if (value === null || typeof value !== "object") return {};
-	const input = value as Record<string, unknown>;
+	// Narrowing JSON.parse output to a keyed access shape is unavoidable;
+	// every field is then checked with a typeof guard before assignment.
+	const input: { readonly [k: string]: unknown } = value as { readonly [k: string]: unknown };
 	const out: Partial<HippoMemoryConfig> = {};
 
-	const boolKeys = [
+	const boolKeys: readonly BoolKey[] = [
 		"autoInject",
 		"autoCapture",
 		"autoOutcome",
 		"autoSleep",
 		"autoLearnGit",
 		"autoShare",
-	] as const;
+	];
 	for (const k of boolKeys) {
-		if (typeof input[k] === "boolean") out[k] = input[k] as boolean;
+		const v = input[k];
+		if (typeof v === "boolean") out[k] = v;
 	}
 
-	const intKeys = ["recallBudget", "recallLimit", "sleepThreshold"] as const;
+	const intKeys: readonly IntKey[] = ["recallBudget", "recallLimit", "sleepThreshold"];
 	for (const k of intKeys) {
 		const v = input[k];
 		if (typeof v === "number" && Number.isInteger(v) && v >= 0) out[k] = v;
@@ -111,11 +129,13 @@ function sanitizeConfigFile(value: unknown): Partial<HippoMemoryConfig> {
 		out.framing = framing;
 	}
 
-	if (typeof input.projectRoot === "string" && input.projectRoot.length > 0) {
-		out.projectRoot = input.projectRoot;
+	const projectRoot = input.projectRoot;
+	if (typeof projectRoot === "string" && projectRoot.length > 0) {
+		out.projectRoot = projectRoot;
 	}
-	if (typeof input.globalRoot === "string" && input.globalRoot.length > 0) {
-		out.globalRoot = input.globalRoot;
+	const globalRoot = input.globalRoot;
+	if (typeof globalRoot === "string" && globalRoot.length > 0) {
+		out.globalRoot = globalRoot;
 	}
 
 	return out;
@@ -124,18 +144,18 @@ function sanitizeConfigFile(value: unknown): Partial<HippoMemoryConfig> {
 const TRUTHY_BOOL_VALUES = new Set(["true", "1", "yes", "on"]);
 const FALSY_BOOL_VALUES = new Set(["false", "0", "no", "off"]);
 
-function applyEnvBool(target: HippoMemoryConfig, key: string, envName: string): void {
+function applyEnvBool(target: HippoMemoryConfig, key: BoolKey, envName: string): void {
 	const val = process.env[envName];
 	if (val === undefined) return;
 	const normalized = val.toLowerCase().trim();
 	if (TRUTHY_BOOL_VALUES.has(normalized)) {
-		(target as unknown as Record<string, unknown>)[key] = true;
+		target[key] = true;
 	} else if (FALSY_BOOL_VALUES.has(normalized)) {
-		(target as unknown as Record<string, unknown>)[key] = false;
+		target[key] = false;
 	}
 }
 
-function applyEnvInt(target: HippoMemoryConfig, key: string, envName: string): void {
+function applyEnvInt(target: HippoMemoryConfig, key: IntKey, envName: string): void {
 	const val = process.env[envName];
 	if (val === undefined) return;
 	// Only accept strict non-negative integer strings. Rejects "1.5", "1000abc",
@@ -143,30 +163,29 @@ function applyEnvInt(target: HippoMemoryConfig, key: string, envName: string): v
 	if (!/^\d+$/.test(val)) return;
 	const n = Number(val);
 	if (Number.isInteger(n) && n >= 0) {
-		(target as unknown as Record<string, unknown>)[key] = n;
+		target[key] = n;
 	}
 }
 
-function applyEnvEnum<K extends keyof HippoMemoryConfig>(
+function applyEnvEnum<K extends "searchMode" | "framing">(
 	target: HippoMemoryConfig,
 	key: K,
 	envName: string,
-	allowed: ReadonlyArray<HippoMemoryConfig[K]>,
+	allowed: readonly HippoMemoryConfig[K][],
 ): void {
 	const val = process.env[envName];
 	if (val === undefined) return;
-	if (allowed.includes(val as HippoMemoryConfig[K])) {
-		(target as unknown as Record<string, unknown>)[key] = val;
+	// `allowed` is the complete set of valid literal values; find narrows val
+	// from `string` to the literal union without any cast.
+	const match = allowed.find((v) => v === val);
+	if (match !== undefined) {
+		target[key] = match;
 	}
 }
 
-function applyEnvString(
-	target: HippoMemoryConfig,
-	key: "projectRoot" | "globalRoot",
-	envName: string,
-): void {
+function applyEnvString(target: HippoMemoryConfig, key: StringKey, envName: string): void {
 	const val = process.env[envName];
 	if (val !== undefined && val.length > 0) {
-		(target as unknown as Record<string, unknown>)[key] = val;
+		target[key] = val;
 	}
 }
