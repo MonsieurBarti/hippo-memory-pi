@@ -152,6 +152,59 @@ describe("sleep and status", () => {
 		expect(s.projectTotal).toBe(0);
 		expect(s.averageStrength).toBe(0);
 	});
+
+	test("newSinceLastSleep counts captures across remember/captureError/decide", async () => {
+		const before = await svc.status();
+		expect(before.newSinceLastSleep).toBe(0);
+		expect(before.lastSleepAt).toBeNull();
+
+		await svc.remember({ content: "one" });
+		await svc.remember({ content: "two" });
+		await svc.captureError({
+			content: "error occurred",
+			tags: ["tool:bash"],
+			source: "test",
+		});
+		await svc.decide({ decision: "use argon2id", context: "compliance" });
+
+		const after = await svc.status();
+		expect(after.newSinceLastSleep).toBe(4);
+	});
+
+	test("sleep(dryRun=true) does NOT reset newSinceLastSleep", async () => {
+		await svc.remember({ content: "a" });
+		await svc.remember({ content: "b" });
+		await svc.sleep({ dryRun: true });
+		const after = await svc.status();
+		expect(after.newSinceLastSleep).toBe(2);
+		expect(after.lastSleepAt).toBeNull();
+	});
+
+	test("sleep() resets newSinceLastSleep and sets lastSleepAt", async () => {
+		await svc.remember({ content: "a" });
+		await svc.remember({ content: "b" });
+		await svc.remember({ content: "c" });
+
+		const result = await svc.sleep();
+		expect(result.durationMs).toBeGreaterThanOrEqual(0);
+
+		const after = await svc.status();
+		expect(after.newSinceLastSleep).toBe(0);
+		expect(after.lastSleepAt).not.toBeNull();
+		expect(typeof after.lastSleepAt).toBe("string");
+		// Should be a valid ISO timestamp
+		expect(new Date(after.lastSleepAt as string).toString()).not.toBe("Invalid Date");
+	});
+
+	test("newSinceLastSleep accumulates again after a sleep cycle", async () => {
+		await svc.remember({ content: "a" });
+		await svc.sleep();
+		expect((await svc.status()).newSinceLastSleep).toBe(0);
+
+		await svc.remember({ content: "b" });
+		await svc.remember({ content: "c" });
+		expect((await svc.status()).newSinceLastSleep).toBe(2);
+	});
 });
 
 describe("working memory", () => {

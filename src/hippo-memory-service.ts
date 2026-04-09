@@ -51,12 +51,35 @@ import type {
 
 type HippoEntry = Record<string, unknown>;
 
+// Shape of a single row returned by hippo-memory's `listMemoryConflicts`.
+// Verified against hippo@0.19.0 schema: the SQLite columns are
+// `id INTEGER PRIMARY KEY`, `memory_a_id`, `memory_b_id`, `reason`, `score`,
+// `status`, `detected_at`, `updated_at`. We only use a subset here.
+interface HippoConflictRow {
+	id: number;
+	memory_a_id: string;
+	memory_b_id: string;
+	reason: string;
+	score: number;
+	status: "open" | "resolved";
+	detected_at: string;
+}
+
 export class HippoMemoryService implements MemoryService {
 	protected readonly config: HippoMemoryConfig;
 	protected readonly writeMutex = new Mutex();
 	private ready = false;
 	private projectRoot: string | null = null;
 	private globalRoot: string | null = null;
+	// Process-local counters used by the auto-sleep hook (Wave 5). hippo does
+	// not expose a cheap "memories created since last consolidation" metric, so
+	// we track it in-process: reset to 0 on sleep(), incremented by every
+	// capture path. lastSleepAt is also process-local; it resets on service
+	// init and gets set by sleep(). Consequence: across distinct sessions the
+	// counter starts at 0 again — acceptable because session_start will not
+	// have auto-sleep racing against incomplete writes.
+	private newMemoriesCount = 0;
+	private lastSleepAt: string | null = null;
 
 	constructor(config: HippoMemoryConfig) {
 		this.config = config;
@@ -84,6 +107,8 @@ export class HippoMemoryService implements MemoryService {
 		}
 
 		this.ready = true;
+		this.newMemoriesCount = 0;
+		this.lastSleepAt = null;
 		return {
 			projectRoot: this.projectRoot,
 			globalRoot: this.globalRoot,
@@ -96,6 +121,8 @@ export class HippoMemoryService implements MemoryService {
 		this.ready = false;
 		this.projectRoot = null;
 		this.globalRoot = null;
+		this.newMemoriesCount = 0;
+		this.lastSleepAt = null;
 	}
 
 	isReady(): boolean {
@@ -137,6 +164,7 @@ export class HippoMemoryService implements MemoryService {
 		await this.withWrite(async () => {
 			await writeEntry(hippoRoot, entry as never);
 		});
+		this.newMemoriesCount++;
 
 		return this.toView(entry, root);
 	}
@@ -158,6 +186,7 @@ export class HippoMemoryService implements MemoryService {
 			await this.withWrite(async () => {
 				await writeEntry(hippoRoot, entry as never);
 			});
+			this.newMemoriesCount++;
 			return this.toView(entry, "project");
 		} catch {
 			// Error-logging path must not itself throw.
@@ -185,6 +214,7 @@ export class HippoMemoryService implements MemoryService {
 		await this.withWrite(async () => {
 			await writeEntry(hippoRoot, entry as never);
 		});
+		this.newMemoriesCount++;
 
 		return this.toView(entry, "project");
 	}
@@ -354,34 +384,24 @@ export class HippoMemoryService implements MemoryService {
 	}
 
 	async listConflicts(status: "open" | "resolved" | "all" = "open"): Promise<MemoryConflictView[]> {
+		// hippo's `listMemoryConflicts` filters via `WHERE status = ?`, so the
+		// "all" sentinel returns zero rows. Callers that want both buckets must
+		// call this method twice. The interface still accepts "all" for
+		// forward-compat if hippo adds proper handling later.
 		const rows = (await listMemoryConflicts(
 			this.requireProjectRoot(),
 			status as never,
-		)) as unknown as Array<Record<string, unknown>>;
+		)) as unknown as Array<HippoConflictRow>;
 
-		return rows.map((row) => {
-			const rawId = row.id;
-			const id = typeof rawId === "number" ? String(rawId) : ((rawId as string) ?? "");
-			const first = (row.memory_a_id as string) ?? (row.first as string) ?? "";
-			const second = (row.memory_b_id as string) ?? (row.second as string) ?? "";
-			const overlap = (row.score as number) ?? (row.overlap as number) ?? 0;
-			const conflictType =
-				(row.reason as string) ??
-				(row.conflict_type as string) ??
-				(row.conflictType as string) ??
-				"unknown";
-			const rowStatus = (row.status as "open" | "resolved") ?? "open";
-			const detectedAt = (row.detected_at as string) ?? (row.detectedAt as string) ?? "";
-			return {
-				id,
-				first,
-				second,
-				overlap,
-				conflictType,
-				status: rowStatus,
-				detectedAt,
-			};
-		});
+		return rows.map((row) => ({
+			id: String(row.id),
+			first: row.memory_a_id,
+			second: row.memory_b_id,
+			overlap: row.score,
+			conflictType: row.reason,
+			status: row.status,
+			detectedAt: row.detected_at,
+		}));
 	}
 
 	// ---------- Mutation ----------
@@ -483,6 +503,13 @@ export class HippoMemoryService implements MemoryService {
 			}
 		}
 
+		// Reset the session-local counter on real sleep cycles. dryRun is a
+		// preview and must not perturb state that downstream hooks depend on.
+		if (opts.dryRun !== true) {
+			this.newMemoriesCount = 0;
+			this.lastSleepAt = new Date().toISOString();
+		}
+
 		return {
 			decayed: (raw.decayed as number | undefined) ?? 0,
 			merged: (raw.merged as number | undefined) ?? 0,
@@ -516,8 +543,8 @@ export class HippoMemoryService implements MemoryService {
 			semantic,
 			buffer,
 			averageStrength,
-			newSinceLastSleep: 0,
-			lastSleepAt: null,
+			newSinceLastSleep: this.newMemoriesCount,
+			lastSleepAt: this.lastSleepAt,
 			searchMode: this.config.searchMode,
 		};
 	}
