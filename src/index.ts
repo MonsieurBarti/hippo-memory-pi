@@ -12,7 +12,8 @@ import {
 	defineTool,
 } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
-import type { ExtensionState } from "./types.js";
+// ExtensionState is defined locally until index.ts is rewritten in Wave 8.
+type ExtensionState = { initialized: boolean; config: { enabled: boolean } };
 
 // Extension state (persisted in tool result details)
 let state: ExtensionState = {
