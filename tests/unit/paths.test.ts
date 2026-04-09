@@ -6,9 +6,9 @@ describe("resolveRoots", () => {
 	const originalEnv = { ...process.env };
 
 	beforeEach(() => {
-		process.env.HIPPO_HOME = undefined;
-		process.env.HIPPO_PROJECT_ROOT = undefined;
-		process.env.HIPPO_GLOBAL_ROOT = undefined;
+		for (const key of ["HIPPO_HOME", "HIPPO_PROJECT_ROOT", "HIPPO_GLOBAL_ROOT"] as const) {
+			delete process.env[key];
+		}
 	});
 
 	afterEach(() => {
