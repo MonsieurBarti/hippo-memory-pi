@@ -1,180 +1,256 @@
-/**
- * Hippo Memory PI Extension Template
- *
- * A starter kit for building PI coding agent extensions following
- * The Forge Flow conventions.
- */
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import type { TObject } from "@sinclair/typebox";
+import { Value } from "@sinclair/typebox/value";
 
-import { StringEnum } from "@mariozechner/pi-ai";
+import type { CommandContext, CommandDefinition } from "./commands";
+import { createAllCommands, createToggleStore } from "./commands";
+import { loadConfig } from "./config";
+import { ErrorCapture, type ToolResultLike } from "./error-capture";
+import { HippoMemoryService } from "./hippo-memory-service";
+import { type AgentEndEvent, createAgentEndHook } from "./hooks/agent-end";
+import { type BeforeAgentStartEvent, createBeforeAgentStartHook } from "./hooks/before-agent-start";
+import { createSessionShutdownHook } from "./hooks/session-shutdown";
 import {
-	type ExtensionAPI,
-	type ExtensionContext,
-	defineTool,
-} from "@mariozechner/pi-coding-agent";
-import { Type } from "@sinclair/typebox";
-import type { ExtensionState } from "./types.js";
+	type NotifyFn,
+	type NotifyLevel,
+	type SessionStartContext,
+	type SessionStartEvent,
+	createSessionStartHook,
+} from "./hooks/session-start";
+import { createToolResultHook } from "./hooks/tool-result";
+import { resolveRoots } from "./paths";
+import { createSessionState } from "./session-state";
+import { SuccessDetector } from "./success-detector";
+import type { ToolDefinition } from "./tools";
+import { createAllTools } from "./tools";
 
-// Extension state (persisted in tool result details)
-let state: ExtensionState = {
-	initialized: false,
-	config: {
-		enabled: true,
-	},
-};
+// ---------------------------------------------------------------------------
+// Structural PI API — minimal subset of what @mariozechner/pi-coding-agent
+// exposes at runtime. We deliberately avoid importing the real type so this
+// package can be imported and unit-tested without the peer dep installed.
+// ---------------------------------------------------------------------------
 
-/**
- * Reconstruct state from session history
- */
-function reconstructState(_sessionManager: ExtensionContext["sessionManager"]): void {
-	// Reset to defaults
-	state = {
-		initialized: false,
-		config: {
-			enabled: true,
-		},
-	};
+type PiEventHandler = (event: unknown, ctx: unknown) => unknown | Promise<unknown>;
 
-	// TODO: Reconstruct from tool result details if needed
-	// for (const entry of sessionManager.getBranch()) {
-	//   if (entry.type === "message" && entry.message.role === "toolResult") {
-	//     if (entry.message.toolName === "hippo-memory-example") {
-	//       state = entry.message.details ?? state;
-	//     }
-	//   }
-	// }
-
-	state.initialized = true;
+interface PiToolExecuteResult {
+	content: Array<{ type: "text"; text: string }>;
+	details: unknown;
 }
 
-/**
- * Hippo Memory PI Extension Entry Point
- */
-export default function hippoMemoryExtension(pi: ExtensionAPI): void {
-	// Session lifecycle: initialize on start
-	pi.on("session_start", async (_event, ctx) => {
-		reconstructState(ctx.sessionManager);
-		if (ctx.hasUI) {
-			ctx.ui.notify("Hippo Memory extension ready", "info");
+interface PiRegisteredTool {
+	name: string;
+	label: string;
+	description: string;
+	promptSnippet: string;
+	promptGuidelines: string[];
+	parameters: unknown;
+	execute(toolCallId: string, input: unknown): Promise<PiToolExecuteResult>;
+}
+
+interface PiRegisteredCommand {
+	description?: string;
+	handler(args: string, ctx: PiCommandContext): Promise<void>;
+}
+
+interface PiCommandContext {
+	ui?: {
+		notify?: (message: string, level?: string) => void;
+	};
+	cwd?: string;
+}
+
+export interface PiExtensionApi {
+	on(event: string, handler: PiEventHandler): void;
+	registerTool(tool: PiRegisteredTool): void;
+	registerCommand(name: string, config: PiRegisteredCommand): void;
+	cwd?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Boundary adapters: bridge Wave 4/6 definitions to PI's structural shape
+// without casts. `wrapTool` uses TypeBox's runtime Value.Check to narrow the
+// unknown input to Static<S> before delegating to the typed execute().
+// ---------------------------------------------------------------------------
+
+function wrapTool<S extends TObject>(def: ToolDefinition<S>): PiRegisteredTool {
+	return {
+		name: def.name,
+		label: def.label,
+		description: def.description,
+		promptSnippet: def.promptSnippet,
+		promptGuidelines: def.promptGuidelines,
+		parameters: def.parameters,
+		async execute(toolCallId, input) {
+			if (!Value.Check(def.parameters, input)) {
+				return {
+					content: [
+						{
+							type: "text",
+							text: `Invalid input for ${def.name}`,
+						},
+					],
+					details: { error: "validation-failed" },
+				};
+			}
+			const result = await def.execute(toolCallId, input);
+			return {
+				content: result.content,
+				details: result.details,
+			};
+		},
+	};
+}
+
+function wrapCommand(def: CommandDefinition): PiRegisteredCommand {
+	return {
+		description: def.description,
+		async handler(args, piCtx) {
+			const ctx: CommandContext = {
+				cwd: piCtx.cwd ?? process.cwd(),
+				ui: {
+					notify: (message, level = "info") => {
+						piCtx.ui?.notify?.(message, level);
+					},
+				},
+			};
+			await def.handler(args, ctx);
+		},
+	};
+}
+
+// ---------------------------------------------------------------------------
+// Default export — called by PI with its ExtensionAPI instance at startup.
+// Wires configuration, service, helpers, hooks, tools, commands.
+// ---------------------------------------------------------------------------
+
+export default function hippoMemoryExtension(pi: PiExtensionApi): void {
+	// 1. Resolve configuration + paths eagerly. This runs once per extension
+	//    instance. The actual SQLite stores are opened lazily by the service
+	//    inside the session_start hook.
+	const cwd = pi.cwd ?? process.cwd();
+	const baseConfig = loadConfig({ cwd });
+	const { projectRoot, globalRoot } = resolveRoots({ cwd, config: baseConfig });
+	const config = { ...baseConfig, projectRoot, globalRoot };
+
+	// 2. Instantiate the singleton collaborators. These outlive individual
+	//    events; they're owned by this extension instance.
+	const service = new HippoMemoryService(config);
+	const errorCapture = new ErrorCapture({ debounceMs: 60_000 });
+	const successDetector = new SuccessDetector();
+	const sessionState = createSessionState({ ringSize: 10 });
+	const toggleStore = createToggleStore();
+
+	// 3. A stderr-backed notify function. PI supplies a richer ctx.ui.notify
+	//    on real events, but the hooks accept a shared NotifyFn at construction
+	//    time. For v1 we log to stderr; a future wave can route this through
+	//    the first non-null ctx.ui.notify if richer presentation is needed.
+	const notify: NotifyFn = (message: string, level: NotifyLevel = "info") => {
+		process.stderr.write(`[hippo-memory-pi] ${level}: ${message}\n`);
+	};
+
+	// 4. Register all tools + commands.
+	for (const def of createAllTools(service)) {
+		pi.registerTool(wrapTool(def));
+	}
+	for (const def of createAllCommands({ service, toggleStore })) {
+		pi.registerCommand(def.name, wrapCommand(def));
+	}
+
+	// 4b. Tell PI where our skill lives so it's discovered even when loaded
+	//     via `pi -e ./src/index.ts` (which skips package.json's pi.skills).
+	//     The path resolves relative to this source file's location — works
+	//     whether running from src/ (jiti) or dist/ (compiled).
+	const extensionDir = dirname(fileURLToPath(import.meta.url));
+	const skillsDir = join(extensionDir, "skills");
+	pi.on("resources_discover", (_event, _ctx) => {
+		return { skills: [skillsDir] };
+	});
+
+	// 5. Build hook handlers.
+	const sessionStart = createSessionStartHook({ service, config, notify });
+	const sessionShutdown = createSessionShutdownHook({ service, config, notify });
+	const beforeAgentStart = createBeforeAgentStartHook({
+		service,
+		config,
+		isToggledOff: toggleStore.isToggledOff,
+	});
+	const toolResult = createToolResultHook({ service, config, errorCapture });
+	const agentEnd = createAgentEndHook({
+		service,
+		config,
+		successDetector,
+		getAnchorIds: sessionState.getAnchorIds,
+		getRecentToolResults: sessionState.getRecentToolResults,
+	});
+
+	// 6. Narrow PI's `unknown` event payloads to the hook-specific event types
+	//    via small type guards. PI's real runtime shapes are supersets of what
+	//    we need; the guards check only the fields we read.
+	function isSessionStartEvent(value: unknown): value is SessionStartEvent {
+		if (value === null || typeof value !== "object") return false;
+		const reason = (value as { reason?: unknown }).reason;
+		return (
+			reason === "startup" ||
+			reason === "new" ||
+			reason === "resume" ||
+			reason === "fork" ||
+			reason === "reload"
+		);
+	}
+
+	function isSessionStartCtx(value: unknown): value is SessionStartContext {
+		if (value === null || typeof value !== "object") return false;
+		return typeof (value as { cwd?: unknown }).cwd === "string";
+	}
+
+	function isBeforeAgentStartEvent(value: unknown): value is BeforeAgentStartEvent {
+		if (value === null || typeof value !== "object") return false;
+		const prompt = (value as { prompt?: unknown }).prompt;
+		const systemPrompt = (value as { systemPrompt?: unknown }).systemPrompt;
+		return typeof prompt === "string" && typeof systemPrompt === "string";
+	}
+
+	function isAgentEndEvent(value: unknown): value is AgentEndEvent {
+		if (value === null || typeof value !== "object") return false;
+		return typeof (value as { stopReason?: unknown }).stopReason === "string";
+	}
+
+	function isToolResultLike(value: unknown): value is ToolResultLike {
+		if (value === null || typeof value !== "object") return false;
+		return typeof (value as { toolName?: unknown }).toolName === "string";
+	}
+
+	// 7. Subscribe. Each handler narrows the payload; anything that doesn't
+	//    match is silently skipped to keep PI's event loop happy.
+	pi.on("session_start", async (event, ctx) => {
+		if (!isSessionStartEvent(event)) return;
+		if (!isSessionStartCtx(ctx)) return;
+		await sessionStart(event, ctx);
+	});
+
+	pi.on("session_shutdown", async (event, ctx) => {
+		await sessionShutdown(event, ctx);
+	});
+
+	pi.on("before_agent_start", async (event, ctx) => {
+		if (!isBeforeAgentStartEvent(event)) return undefined;
+		const result = await beforeAgentStart(event, ctx);
+		if (result) {
+			sessionState.setAnchorIds(result.message.details.memoryIds);
 		}
+		return result;
 	});
 
-	// Session lifecycle: cleanup on shutdown
-	pi.on("session_shutdown", async () => {
-		// Cleanup any resources here
+	pi.on("tool_result", async (event, ctx) => {
+		if (!isToolResultLike(event)) return;
+		sessionState.recordToolResult({ isError: event.isError === true });
+		await toolResult(event, ctx);
 	});
 
-	// Register example tool
-	pi.registerTool(
-		defineTool({
-			name: "hippo-memory-example",
-			label: "Hippo Memory Example Tool",
-			description:
-				"Example tool for the Hippo Memory extension template. Demonstrates the standard pattern for Hippo Memory tools.",
-			parameters: Type.Object({
-				action: StringEnum(["list", "create", "delete"] as const, {
-					description: "Action to perform",
-				}),
-				input: Type.Optional(
-					Type.String({
-						description: "Input value for the action",
-					}),
-				),
-			}),
-			async execute(_toolCallId, params, signal, _onUpdate, _ctx) {
-				// Check for cancellation
-				if (signal?.aborted) {
-					return {
-						content: [{ type: "text", text: "Operation cancelled" }],
-						details: { action: params.action, cancelled: true },
-					};
-				}
-
-				// Handle actions
-				switch (params.action) {
-					case "list":
-						return {
-							content: [
-								{
-									type: "text",
-									text: "Hippo Memory Example Tool - List action\n\nNo items to list yet.",
-								},
-							],
-							details: { action: "list", items: [] },
-						};
-
-					case "create":
-						if (!params.input) {
-							return {
-								content: [
-									{
-										type: "text",
-										text: "Error: 'input' parameter required for 'create' action",
-									},
-								],
-								details: { action: "create", error: "input required" },
-								isError: true,
-							};
-						}
-						return {
-							content: [
-								{
-									type: "text",
-									text: `Created: ${params.input}`,
-								},
-							],
-							details: { action: "create", created: params.input },
-						};
-
-					case "delete":
-						return {
-							content: [
-								{
-									type: "text",
-									text: "Delete action - not implemented in template",
-								},
-							],
-							details: { action: "delete" },
-						};
-
-					default: {
-						// TypeScript exhaustiveness check
-						const _exhaustive: never = params.action;
-						return {
-							content: [
-								{
-									type: "text",
-									text: `Unknown action: ${String(_exhaustive)}`,
-								},
-							],
-							details: { action: "unknown" },
-							isError: true,
-						};
-					}
-				}
-			},
-		}),
-	);
-
-	// Register example command
-	pi.registerCommand("hippo-memory-status", {
-		description: "Show Hippo Memory extension status",
-		handler: async (_args, ctx) => {
-			const status = state.config.enabled ? "enabled" : "disabled";
-			if (ctx.hasUI) {
-				ctx.ui.notify(`Hippo Memory extension is ${status}`, "info");
-			}
-		},
-	});
-
-	// Register toggle command
-	pi.registerCommand("hippo-memory-toggle", {
-		description: "Toggle Hippo Memory extension on/off",
-		handler: async (_args, ctx) => {
-			state.config.enabled = !state.config.enabled;
-			const status = state.config.enabled ? "enabled" : "disabled";
-			if (ctx.hasUI) {
-				ctx.ui.notify(`Hippo Memory extension ${status}`, "info");
-			}
-		},
+	pi.on("agent_end", async (event, ctx) => {
+		if (!isAgentEndEvent(event)) return;
+		await agentEnd(event, ctx);
+		sessionState.clearAnchorIds();
 	});
 }

@@ -29,5 +29,12 @@ yarn-error.log*
 .env.local
 .env.*.local
 
-# Superpowers docs
+# PI runtime (hippo DB + tff state)
+.pi/
+
+# Worktrees
+.worktrees/
+
+# Superpowers docs + plans
 docs/superpowers/
+docs/plans/

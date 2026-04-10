@@ -1,7 +1,7 @@
 {
 	"name": "@the-forge-flow/hippo-memory-pi",
 	"version": "0.0.0",
-	"description": "Hippo Memory PI",
+	"description": "PI extension for biologically-inspired long-term memory, powered by hippo-memory",
 	"type": "module",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
@@ -13,6 +13,7 @@
 	},
 	"files": ["dist", "README.md", "LICENSE"],
 	"scripts": {
+		"prebuild": "mkdir -p dist/skills/hippo-memory && cp src/skills/hippo-memory/SKILL.md dist/skills/hippo-memory/",
 		"build": "tsc -p tsconfig.build.json",
 		"dev": "tsc -p tsconfig.build.json --watch",
 		"test": "vitest run",
@@ -20,12 +21,24 @@
 		"test:coverage": "vitest run --coverage",
 		"lint": "biome check .",
 		"lint:fix": "biome check --write .",
+		"check": "biome check .",
+		"check:fix": "biome check --write .",
 		"fmt": "biome format --write .",
 		"typecheck": "tsc --noEmit",
 		"clean": "rm -rf dist",
 		"prepare": "lefthook install || true"
 	},
-	"keywords": ["pi", "pi-coding-agent", "extension", "hippo-memory", "the-forge-flow"],
+	"keywords": [
+		"pi-package",
+		"pi",
+		"pi-coding-agent",
+		"extension",
+		"memory",
+		"hippocampus",
+		"hippo-memory",
+		"tff",
+		"the-forge-flow"
+	],
 	"author": "The Forge Flow",
 	"license": "MIT",
 	"repository": {
@@ -40,10 +53,15 @@
 		"access": "public"
 	},
 	"engines": {
-		"node": ">=20.0.0"
+		"node": ">=22.5.0"
 	},
 	"pi": {
-		"extensions": ["./dist/index.js"]
+		"extensions": ["./dist/index.js"],
+		"skills": ["./dist/skills"]
+	},
+	"dependencies": {
+		"hippo-memory": "^0.19.0",
+		"@huggingface/transformers": "^3.0.0"
 	},
 	"peerDependencies": {
 		"@mariozechner/pi-coding-agent": "*",
