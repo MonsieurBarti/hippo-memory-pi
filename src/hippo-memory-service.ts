@@ -1,4 +1,6 @@
 import { mkdirSync } from "node:fs";
+import { createRequire } from "node:module";
+import { join } from "node:path";
 import {
 	type ConsolidationResult as HippoConsolidationResult,
 	type WorkingMemoryItem as HippoWorkingMemoryItem,
@@ -94,15 +96,6 @@ export class HippoMemoryService implements MemoryService {
 	private ready = false;
 	private projectRoot: string | null = null;
 	private globalRoot: string | null = null;
-	// Process-local counters used by the auto-sleep hook (Wave 5). hippo does
-	// not expose a cheap "memories created since last consolidation" metric, so
-	// we track it in-process: reset to 0 on sleep(), incremented by every
-	// capture path. lastSleepAt is also process-local; it resets on service
-	// init and gets set by sleep(). Consequence: across distinct sessions the
-	// counter starts at 0 again — acceptable because session_start will not
-	// have auto-sleep racing against incomplete writes.
-	private newMemoriesCount = 0;
-	private lastSleepAt: string | null = null;
 
 	constructor(config: HippoMemoryConfig) {
 		this.config = config;
@@ -130,8 +123,6 @@ export class HippoMemoryService implements MemoryService {
 		}
 
 		this.ready = true;
-		this.newMemoriesCount = 0;
-		this.lastSleepAt = null;
 		return {
 			projectRoot: this.projectRoot,
 			globalRoot: this.globalRoot,
@@ -144,8 +135,6 @@ export class HippoMemoryService implements MemoryService {
 		this.ready = false;
 		this.projectRoot = null;
 		this.globalRoot = null;
-		this.newMemoriesCount = 0;
-		this.lastSleepAt = null;
 	}
 
 	isReady(): boolean {
@@ -191,7 +180,6 @@ export class HippoMemoryService implements MemoryService {
 		await this.withWrite(async () => {
 			writeEntry(hippoRoot, entry);
 		});
-		this.newMemoriesCount++;
 
 		return this.toView(entry, root);
 	}
@@ -213,7 +201,6 @@ export class HippoMemoryService implements MemoryService {
 			await this.withWrite(async () => {
 				writeEntry(hippoRoot, entry);
 			});
-			this.newMemoriesCount++;
 			return this.toView(entry, "project");
 		} catch {
 			// Error-logging path must not itself throw.
@@ -241,7 +228,6 @@ export class HippoMemoryService implements MemoryService {
 		await this.withWrite(async () => {
 			writeEntry(hippoRoot, entry);
 		});
-		this.newMemoriesCount++;
 
 		return this.toView(entry, "project");
 	}
@@ -513,13 +499,6 @@ export class HippoMemoryService implements MemoryService {
 			}
 		}
 
-		// Reset the session-local counter on real sleep cycles. dryRun is a
-		// preview and must not perturb state that downstream hooks depend on.
-		if (opts.dryRun !== true) {
-			this.newMemoriesCount = 0;
-			this.lastSleepAt = new Date().toISOString();
-		}
-
 		return {
 			decayed: raw.decayed,
 			merged: raw.merged,
@@ -543,6 +522,10 @@ export class HippoMemoryService implements MemoryService {
 				? projectEntries.reduce((acc, e) => acc + e.strength, 0) / projectEntries.length
 				: 0;
 
+		// Read persistent sleep metrics from hippo's SQLite tables rather than
+		// relying on in-process counters that reset between sessions.
+		const { newSinceLastSleep, lastSleepAt } = this.loadSleepMetrics(project);
+
 		return {
 			projectTotal: projectEntries.length,
 			globalTotal: globalEntries.length,
@@ -550,8 +533,8 @@ export class HippoMemoryService implements MemoryService {
 			semantic,
 			buffer,
 			averageStrength,
-			newSinceLastSleep: this.newMemoriesCount,
-			lastSleepAt: this.lastSleepAt,
+			newSinceLastSleep,
+			lastSleepAt,
 			searchMode: this.config.searchMode,
 		};
 	}
@@ -686,6 +669,64 @@ export class HippoMemoryService implements MemoryService {
 	}
 
 	// ---------- Private helpers ----------
+
+	/**
+	 * Read newSinceLastSleep and lastSleepAt from hippo's SQLite tables.
+	 * Uses two read-only queries:
+	 * - `MAX(timestamp) FROM consolidation_runs` → lastSleepAt
+	 * - `COUNT(*) FROM memories WHERE created > lastSleepAt` → newSinceLastSleep
+	 * Falls back to {0, null} on any error (e.g., DB not yet initialized).
+	 */
+	private loadSleepMetrics(projectRoot: string): {
+		newSinceLastSleep: number;
+		lastSleepAt: string | null;
+	} {
+		try {
+			// Lazily require node:sqlite via createRequire so Vite/vitest doesn't
+			// attempt to bundle it — the module is experimental (Node 22.5+) and
+			// not on Vite's built-in list. hippo-memory itself loads it the same
+			// way internally, so this is guaranteed to resolve at runtime.
+			const nodeRequire = createRequire(import.meta.url);
+			const { DatabaseSync } = nodeRequire("node:sqlite") as {
+				DatabaseSync: new (
+					path: string,
+					options?: { open?: boolean },
+				) => {
+					prepare(sql: string): {
+						get(...params: unknown[]): { [key: string]: unknown } | undefined;
+					};
+					close(): void;
+				};
+			};
+
+			const dbPath = join(projectRoot, "hippo.db");
+			const db = new DatabaseSync(dbPath, { open: true });
+
+			// Last consolidation timestamp
+			const lastRunRow = db.prepare("SELECT MAX(timestamp) as ts FROM consolidation_runs").get();
+			const rawTs = lastRunRow?.ts;
+			const lastSleepAt = typeof rawTs === "string" ? rawTs : null;
+
+			// Count memories created since last sleep (or all if never slept)
+			let newSinceLastSleep: number;
+			if (lastSleepAt) {
+				const countRow = db
+					.prepare("SELECT COUNT(*) as cnt FROM memories WHERE created > ?")
+					.get(lastSleepAt);
+				const cnt = countRow?.cnt;
+				newSinceLastSleep = typeof cnt === "number" ? cnt : 0;
+			} else {
+				const countRow = db.prepare("SELECT COUNT(*) as cnt FROM memories").get();
+				const cnt = countRow?.cnt;
+				newSinceLastSleep = typeof cnt === "number" ? cnt : 0;
+			}
+
+			db.close();
+			return { newSinceLastSleep, lastSleepAt };
+		} catch {
+			return { newSinceLastSleep: 0, lastSleepAt: null };
+		}
+	}
 
 	private async findRootContaining(id: string): Promise<string | null> {
 		const project = this.requireProjectRoot();
