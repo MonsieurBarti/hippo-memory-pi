@@ -1,3 +1,5 @@
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { TObject } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 
@@ -154,6 +156,16 @@ export default function hippoMemoryExtension(pi: PiExtensionApi): void {
 	for (const def of createAllCommands({ service, toggleStore })) {
 		pi.registerCommand(def.name, wrapCommand(def));
 	}
+
+	// 4b. Tell PI where our skill lives so it's discovered even when loaded
+	//     via `pi -e ./src/index.ts` (which skips package.json's pi.skills).
+	//     The path resolves relative to this source file's location — works
+	//     whether running from src/ (jiti) or dist/ (compiled).
+	const extensionDir = dirname(fileURLToPath(import.meta.url));
+	const skillsDir = join(extensionDir, "skills");
+	pi.on("resources_discover", (_event, _ctx) => {
+		return { skills: [skillsDir] };
+	});
 
 	// 5. Build hook handlers.
 	const sessionStart = createSessionStartHook({ service, config, notify });

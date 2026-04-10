@@ -104,13 +104,14 @@ describe("extension entry point", () => {
 		]);
 	});
 
-	test("subscribes to the 5 core lifecycle events", () => {
+	test("subscribes to the 6 lifecycle events (5 core + resources_discover)", () => {
 		const { api, handlers } = createCapturingPiApi(tmpCwd);
 		hippoMemoryExtension(api);
 		const events = handlers.map((h) => h.event).sort();
 		expect(events).toEqual([
 			"agent_end",
 			"before_agent_start",
+			"resources_discover",
 			"session_shutdown",
 			"session_start",
 			"tool_result",
