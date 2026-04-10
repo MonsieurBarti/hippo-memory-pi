@@ -24,7 +24,7 @@ const ALLOWED_TOOLS_IN_FRONTMATTER = [
 ] as const;
 
 describe("HIPPO_MEMORY skill file", () => {
-	const skillPath = join(process.cwd(), "src", "skill", "HIPPO_MEMORY.md");
+	const skillPath = join(process.cwd(), "src", "skills", "hippo-memory", "SKILL.md");
 	const content = readFileSync(skillPath, "utf8");
 
 	test("file exists and is non-trivially sized", () => {

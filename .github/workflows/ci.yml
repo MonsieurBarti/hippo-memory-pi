@@ -76,4 +76,4 @@ jobs:
         run: bun run build
 
       - name: Verify skill shipped
-        run: test -f dist/skill/HIPPO_MEMORY.md || echo "Skill not yet present (will be added in Wave 7)"
+        run: test -f dist/skills/hippo-memory/SKILL.md
