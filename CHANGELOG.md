@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.2](https://github.com/MonsieurBarti/hippo-memory-pi/compare/hippo-memory-pi-v0.1.1...hippo-memory-pi-v0.1.2) (2026-04-10)
+
+
+### Bug Fixes
+
+* **release:** use npm_config_token + point at config/manifest files ([f3a6b27](https://github.com/MonsieurBarti/hippo-memory-pi/commit/f3a6b278c1d20ca5cfb174ad6ebd7a6aa0c68717))
+* **release:** use npm_config_token env var for bun publish ([a4b764c](https://github.com/MonsieurBarti/hippo-memory-pi/commit/a4b764c56b3a52c4e0473b8ed227a7933cc28ea8))
+
 ## [0.1.1](https://github.com/MonsieurBarti/hippo-memory-pi/compare/hippo-memory-pi-v0.1.0...hippo-memory-pi-v0.1.1) (2026-04-10)
 
 
