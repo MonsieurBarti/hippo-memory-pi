@@ -37,6 +37,7 @@ function createCapturingPiApi(cwd: string): {
 	const handlers: CapturedHandler[] = [];
 	const api: PiExtensionApi = {
 		cwd,
+		exec: vi.fn().mockResolvedValue({ stdout: "", code: 0 }),
 		on(event, handler) {
 			handlers.push({ event, handler });
 		},
