@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.3](https://github.com/MonsieurBarti/hippo-memory-pi/compare/hippo-memory-pi-v0.1.2...hippo-memory-pi-v0.1.3) (2026-04-11)
+
+
+### Features
+
+* add readOnly classification to tool definitions ([075af18](https://github.com/MonsieurBarti/hippo-memory-pi/commit/075af18c4e4f45097c9c5e031fd012568624a8fc))
+* add readOnly classification to tool definitions ([5b7d9cf](https://github.com/MonsieurBarti/hippo-memory-pi/commit/5b7d9cf873a060f15233661009d79dde132ca1c4))
+
 ## [0.1.2](https://github.com/MonsieurBarti/hippo-memory-pi/compare/hippo-memory-pi-v0.1.1...hippo-memory-pi-v0.1.2) (2026-04-10)
 
 
