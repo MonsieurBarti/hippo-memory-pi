@@ -14,6 +14,7 @@ export function createInvalidateTool(
 ): ToolDefinition<typeof InvalidateParams> {
 	return {
 		name: "tff-memory_invalidate",
+		readOnly: false,
 		label: "Invalidate",
 		description:
 			"Actively weaken memories matching a pattern (content or tags). Use on migrations (X → Y) — don't wait for decay.",

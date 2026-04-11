@@ -18,6 +18,7 @@ export type RecallInput = Static<typeof RecallParams>;
 export function createRecallTool(service: MemoryService): ToolDefinition<typeof RecallParams> {
 	return {
 		name: "tff-memory_recall",
+		readOnly: true,
 		label: "Recall",
 		description:
 			"Search hippo memory. Returns ranked matches with strength, confidence, tags, and optional match explanations.",

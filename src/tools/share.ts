@@ -14,6 +14,7 @@ export type ShareInput = Static<typeof ShareParams>;
 export function createShareTool(service: MemoryService): ToolDefinition<typeof ShareParams> {
 	return {
 		name: "tff-memory_share",
+		readOnly: false,
 		label: "Share to Global",
 		description: "Promote a memory (or auto-select high-transfer memories) to the global store.",
 		promptSnippet: "Promote a memory (or auto-picked set) to the global store.",

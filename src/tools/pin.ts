@@ -12,6 +12,7 @@ export type PinInput = Static<typeof PinParams>;
 export function createPinTool(service: MemoryService): ToolDefinition<typeof PinParams> {
 	return {
 		name: "tff-memory_pin",
+		readOnly: false,
 		label: "Pin",
 		description: "Pin (infinite half-life) or unpin a memory. Escape hatch — use sparingly.",
 		promptSnippet: "Pin or unpin a memory to prevent decay.",

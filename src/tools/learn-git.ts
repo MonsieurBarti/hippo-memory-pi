@@ -12,6 +12,7 @@ export type LearnGitInput = Static<typeof LearnGitParams>;
 export function createLearnGitTool(service: MemoryService): ToolDefinition<typeof LearnGitParams> {
 	return {
 		name: "tff-memory_learn_git",
+		readOnly: false,
 		label: "Learn From Git",
 		description: "Scan git history for fix/revert/bug commits and extract lessons.",
 		promptSnippet: "Extract lessons from recent git history.",
