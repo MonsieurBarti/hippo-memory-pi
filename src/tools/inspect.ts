@@ -11,6 +11,7 @@ export type InspectInput = Static<typeof InspectParams>;
 export function createInspectTool(service: MemoryService): ToolDefinition<typeof InspectParams> {
 	return {
 		name: "tff-memory_inspect",
+		readOnly: true,
 		label: "Inspect",
 		description: "Return full details of a single memory entry.",
 		promptSnippet: "Fetch a single memory by id.",

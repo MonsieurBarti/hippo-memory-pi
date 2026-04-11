@@ -9,6 +9,7 @@ export type StatusInput = Static<typeof StatusParams>;
 export function createStatusTool(service: MemoryService): ToolDefinition<typeof StatusParams> {
 	return {
 		name: "tff-memory_status",
+		readOnly: true,
 		label: "Memory Status",
 		description:
 			"Return memory store statistics: total, by layer, average strength, new since last sleep, search mode.",

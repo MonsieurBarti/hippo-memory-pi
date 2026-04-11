@@ -11,6 +11,7 @@ export type ForgetInput = Static<typeof ForgetParams>;
 export function createForgetTool(service: MemoryService): ToolDefinition<typeof ForgetParams> {
 	return {
 		name: "tff-memory_forget",
+		readOnly: false,
 		label: "Forget",
 		description: "Hard-delete a memory. Irreversible.",
 		promptSnippet: "Hard-delete a memory entry by id.",

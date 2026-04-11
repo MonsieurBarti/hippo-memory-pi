@@ -11,6 +11,7 @@ export type SleepInput = Static<typeof SleepParams>;
 export function createSleepTool(service: MemoryService): ToolDefinition<typeof SleepParams> {
 	return {
 		name: "tff-memory_sleep",
+		readOnly: false,
 		label: "Sleep",
 		description:
 			"Run hippo consolidation: decay → merge overlapping episodics into semantic patterns → detect conflicts → auto-share to global.",

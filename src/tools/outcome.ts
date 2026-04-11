@@ -12,6 +12,7 @@ export type OutcomeInput = Static<typeof OutcomeParams>;
 export function createOutcomeTool(service: MemoryService): ToolDefinition<typeof OutcomeParams> {
 	return {
 		name: "tff-memory_outcome",
+		readOnly: false,
 		label: "Outcome",
 		description:
 			"Apply reward signal to a memory (good/bad). Updates effective half-life via hippo's reward propagation.",

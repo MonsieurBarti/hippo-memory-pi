@@ -14,6 +14,7 @@ export type DecideInput = Static<typeof DecideParams>;
 export function createDecideTool(service: MemoryService): ToolDefinition<typeof DecideParams> {
 	return {
 		name: "tff-memory_decide",
+		readOnly: false,
 		label: "Decide",
 		description:
 			"Record an architectural decision. 90-day base half-life, verified confidence. Use for long-term choices, not ephemeral workarounds.",

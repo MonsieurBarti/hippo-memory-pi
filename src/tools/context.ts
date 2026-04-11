@@ -16,6 +16,7 @@ export type ContextInput = Static<typeof ContextParams>;
 export function createContextTool(service: MemoryService): ToolDefinition<typeof ContextParams> {
 	return {
 		name: "tff-memory_context",
+		readOnly: true,
 		label: "Memory Context",
 		description:
 			"Return formatted memory context (observe/suggest/assert framing) for the current query.",

@@ -11,6 +11,7 @@ export type WmReadInput = Static<typeof WmReadParams>;
 export function createWmReadTool(service: MemoryService): ToolDefinition<typeof WmReadParams> {
 	return {
 		name: "tff-memory_wm_read",
+		readOnly: true,
 		label: "Working Memory Read",
 		description: "Read working memory items for a scope.",
 		promptSnippet: "Read all working-memory items in a scope.",

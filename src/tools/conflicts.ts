@@ -15,6 +15,7 @@ export function createConflictsTool(
 ): ToolDefinition<typeof ConflictsParams> {
 	return {
 		name: "tff-memory_conflicts",
+		readOnly: true,
 		label: "Conflicts",
 		description: "List memory conflicts detected during sleep consolidation.",
 		promptSnippet: "List open or resolved memory conflicts.",

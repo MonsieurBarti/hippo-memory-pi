@@ -74,12 +74,18 @@ export interface PiExtensionApi {
 // ---------------------------------------------------------------------------
 
 function wrapTool<S extends TObject>(def: ToolDefinition<S>): PiRegisteredTool {
+	const guidelines = [...def.promptGuidelines];
+	if (def.readOnly) {
+		guidelines.push(
+			"This tool is read-only (no side effects). Safe to call in parallel with other read-only tools.",
+		);
+	}
 	return {
 		name: def.name,
 		label: def.label,
 		description: def.description,
 		promptSnippet: def.promptSnippet,
-		promptGuidelines: def.promptGuidelines,
+		promptGuidelines: guidelines,
 		parameters: def.parameters,
 		async execute(toolCallId, input) {
 			if (!Value.Check(def.parameters, input)) {

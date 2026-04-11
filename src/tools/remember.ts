@@ -18,6 +18,7 @@ export type RememberInput = Static<typeof RememberParams>;
 export function createRememberTool(service: MemoryService): ToolDefinition<typeof RememberParams> {
 	return {
 		name: "tff-memory_remember",
+		readOnly: false,
 		label: "Remember",
 		description:
 			"Store an observation in hippo memory. Errors get extra half-life. Use sparingly — only for non-obvious, non-derivable facts.",

@@ -12,6 +12,7 @@ export type ResolveInput = Static<typeof ResolveParams>;
 export function createResolveTool(service: MemoryService): ToolDefinition<typeof ResolveParams> {
 	return {
 		name: "tff-memory_resolve",
+		readOnly: false,
 		label: "Resolve Conflict",
 		description:
 			"Resolve a memory conflict by choosing which side to keep. The other side is deleted.",

@@ -6,6 +6,7 @@ import type { Static, TObject } from "@sinclair/typebox";
 // `parameters` to its own TypeBox schema via a generic.
 export interface ToolDefinition<S extends TObject = TObject> {
 	name: string;
+	readOnly?: boolean;
 	label: string;
 	description: string;
 	promptSnippet: string;

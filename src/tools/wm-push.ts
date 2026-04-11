@@ -14,6 +14,7 @@ export type WmPushInput = Static<typeof WmPushParams>;
 export function createWmPushTool(service: MemoryService): ToolDefinition<typeof WmPushParams> {
 	return {
 		name: "tff-memory_wm_push",
+		readOnly: false,
 		label: "Working Memory Push",
 		description:
 			"Push to bounded working memory (session scratchpad). Max 20 per scope, importance-evicted, no decay.",
