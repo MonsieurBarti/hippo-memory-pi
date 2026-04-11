@@ -31,6 +31,7 @@ yarn-error.log*
 
 # PI runtime (hippo DB + tff state)
 .pi/
+.hippo/
 
 # Worktrees
 .worktrees/
