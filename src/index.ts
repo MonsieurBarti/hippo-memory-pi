@@ -24,6 +24,7 @@ import { createSessionState } from "./session-state";
 import { SuccessDetector } from "./success-detector";
 import type { ToolDefinition } from "./tools";
 import { createAllTools } from "./tools";
+import { checkForUpdates } from "./update-check.js";
 
 // ---------------------------------------------------------------------------
 // Structural PI API — minimal subset of what @mariozechner/pi-coding-agent
@@ -65,6 +66,11 @@ export interface PiExtensionApi {
 	registerTool(tool: PiRegisteredTool): void;
 	registerCommand(name: string, config: PiRegisteredCommand): void;
 	cwd?: string;
+	exec: (
+		cmd: string,
+		args: string[],
+		opts?: { timeout?: number },
+	) => Promise<{ stdout: string; code: number }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -233,6 +239,15 @@ export default function hippoMemoryExtension(pi: PiExtensionApi): void {
 		if (!isSessionStartEvent(event)) return;
 		if (!isSessionStartCtx(ctx)) return;
 		await sessionStart(event, ctx);
+
+		// Check for extension updates
+		const updateInfo = await checkForUpdates(pi);
+		if (updateInfo?.updateAvailable) {
+			notify(
+				`📦 Update available: ${updateInfo.latestVersion} (you have ${updateInfo.currentVersion}). Run: pi install npm:@the-forge-flow/hippo-memory-pi`,
+				"info",
+			);
+		}
 	});
 
 	pi.on("session_shutdown", async (event, ctx) => {

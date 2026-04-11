@@ -36,6 +36,7 @@ export function createFakePiApi(cwd: string): FakePiApi {
 
 	const api: PiExtensionApi = {
 		cwd,
+		exec: vi.fn().mockResolvedValue({ stdout: "", code: 0 }),
 		on(event: string, handler: EventHandler) {
 			const list = handlers.get(event) ?? [];
 			list.push(handler);
