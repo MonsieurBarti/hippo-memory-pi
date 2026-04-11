@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.4](https://github.com/MonsieurBarti/hippo-memory-pi/compare/hippo-memory-pi-v0.1.3...hippo-memory-pi-v0.1.4) (2026-04-11)
+
+
+### Features
+
+* add update notification on session start ([c405ead](https://github.com/MonsieurBarti/hippo-memory-pi/commit/c405ead9dbf0cd84b99823c90dce9b8583e3ab98))
+* add update notification on session_start ([4123900](https://github.com/MonsieurBarti/hippo-memory-pi/commit/41239000b92c35d62f70e9a3fe4aac25ecf1df6b))
+
 ## [0.1.3](https://github.com/MonsieurBarti/hippo-memory-pi/compare/hippo-memory-pi-v0.1.2...hippo-memory-pi-v0.1.3) (2026-04-11)
 
 
