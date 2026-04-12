@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { SuccessDetector } from "../../src/success-detector";
+import { SuccessDetector } from "../../src/success-detector.js";
 
 describe("SuccessDetector.assess", () => {
 	const detector = new SuccessDetector();

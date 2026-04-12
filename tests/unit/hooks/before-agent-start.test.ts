@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
-import { DEFAULT_CONFIG } from "../../../src/config";
-import { createBeforeAgentStartHook } from "../../../src/hooks/before-agent-start";
-import { createFakeService } from "../../fixtures/fake-memory-service";
+import { DEFAULT_CONFIG } from "../../../src/config.js";
+import { createBeforeAgentStartHook } from "../../../src/hooks/before-agent-start.js";
+import { createFakeService } from "../../fixtures/fake-memory-service.js";
 
 describe("before-agent-start hook", () => {
 	test("returns undefined when autoInject is false", async () => {

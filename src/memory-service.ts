@@ -15,7 +15,7 @@ import type {
 	RememberInput,
 	ShareResult,
 	WorkingMemoryItem,
-} from "./types";
+} from "./types.js";
 
 export interface MemoryService {
 	// Lifecycle

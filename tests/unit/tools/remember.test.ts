@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
-import { createRememberTool } from "../../../src/tools/remember";
-import { createFakeEntry, createFakeService } from "../../fixtures/fake-memory-service";
+import { createRememberTool } from "../../../src/tools/remember.js";
+import { createFakeEntry, createFakeService } from "../../fixtures/fake-memory-service.js";
 
 describe("tff-memory_remember tool", () => {
 	test("forwards input to service.remember", async () => {

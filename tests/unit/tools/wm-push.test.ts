@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
-import { createWmPushTool } from "../../../src/tools/wm-push";
-import { createFakeService } from "../../fixtures/fake-memory-service";
+import { createWmPushTool } from "../../../src/tools/wm-push.js";
+import { createFakeService } from "../../fixtures/fake-memory-service.js";
 
 describe("tff-memory_wm_push tool", () => {
 	test("forwards item to service.wmPush", async () => {

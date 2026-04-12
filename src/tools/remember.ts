@@ -1,6 +1,6 @@
 import { type Static, Type } from "@sinclair/typebox";
-import type { MemoryService } from "../memory-service";
-import type { ToolDefinition, ToolExecuteResult } from "./types";
+import type { MemoryService } from "../memory-service.js";
+import type { ToolDefinition, ToolExecuteResult } from "./types.js";
 
 export const RememberParams = Type.Object({
 	content: Type.String({ description: "Text to remember" }),

@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
-import { createLearnGitTool } from "../../../src/tools/learn-git";
-import { createFakeService } from "../../fixtures/fake-memory-service";
+import { createLearnGitTool } from "../../../src/tools/learn-git.js";
+import { createFakeService } from "../../fixtures/fake-memory-service.js";
 
 describe("tff-memory_learn_git tool", () => {
 	test("forwards options and formats summary", async () => {

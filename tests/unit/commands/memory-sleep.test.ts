@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
-import { createMemorySleepCommand } from "../../../src/commands/memory-sleep";
-import { createFakeCommandContext } from "../../fixtures/fake-command-context";
-import { createFakeService } from "../../fixtures/fake-memory-service";
+import { createMemorySleepCommand } from "../../../src/commands/memory-sleep.js";
+import { createFakeCommandContext } from "../../fixtures/fake-command-context.js";
+import { createFakeService } from "../../fixtures/fake-memory-service.js";
 
 describe("/memory-sleep command", () => {
 	test("runs a real sleep by default", async () => {

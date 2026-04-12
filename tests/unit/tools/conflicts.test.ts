@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
-import { createConflictsTool } from "../../../src/tools/conflicts";
-import { createFakeService } from "../../fixtures/fake-memory-service";
+import { createConflictsTool } from "../../../src/tools/conflicts.js";
+import { createFakeService } from "../../fixtures/fake-memory-service.js";
 
 describe("tff-memory_conflicts tool", () => {
 	test("defaults to 'open' status and maps conflicts", async () => {

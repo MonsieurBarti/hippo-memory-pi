@@ -1,6 +1,6 @@
-import type { HippoMemoryConfig } from "../config";
-import type { MemoryService } from "../memory-service";
-import type { SuccessDetector, ToolResultSummary } from "../success-detector";
+import type { HippoMemoryConfig } from "../config.js";
+import type { MemoryService } from "../memory-service.js";
+import type { SuccessDetector, ToolResultSummary } from "../success-detector.js";
 
 export interface AgentEndEvent {
 	stopReason: string;

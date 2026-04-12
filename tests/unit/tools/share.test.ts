@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
-import { createShareTool } from "../../../src/tools/share";
-import { createFakeService } from "../../fixtures/fake-memory-service";
+import { createShareTool } from "../../../src/tools/share.js";
+import { createFakeService } from "../../fixtures/fake-memory-service.js";
 
 describe("tff-memory_share tool", () => {
 	test("shares by id", async () => {

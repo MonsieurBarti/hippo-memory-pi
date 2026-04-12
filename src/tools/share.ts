@@ -1,7 +1,7 @@
 import { type Static, Type } from "@sinclair/typebox";
-import type { MemoryService } from "../memory-service";
-import type { ShareResult } from "../types";
-import type { ToolDefinition, ToolExecuteResult } from "./types";
+import type { MemoryService } from "../memory-service.js";
+import type { ShareResult } from "../types.js";
+import type { ToolDefinition, ToolExecuteResult } from "./types.js";
 
 export const ShareParams = Type.Object({
 	id: Type.Optional(Type.String()),

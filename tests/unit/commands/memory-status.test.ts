@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
-import { createMemoryStatusCommand } from "../../../src/commands/memory-status";
-import { createFakeCommandContext } from "../../fixtures/fake-command-context";
-import { createFakeService } from "../../fixtures/fake-memory-service";
+import { createMemoryStatusCommand } from "../../../src/commands/memory-status.js";
+import { createFakeCommandContext } from "../../fixtures/fake-command-context.js";
+import { createFakeService } from "../../fixtures/fake-memory-service.js";
 
 describe("/memory-status command", () => {
 	test("prints the store stats via notify", async () => {

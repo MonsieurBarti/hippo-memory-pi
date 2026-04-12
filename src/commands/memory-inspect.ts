@@ -1,5 +1,5 @@
-import type { MemoryService } from "../memory-service";
-import type { CommandContext, CommandDefinition } from "./types";
+import type { MemoryService } from "../memory-service.js";
+import type { CommandContext, CommandDefinition } from "./types.js";
 
 export function createMemoryInspectCommand(service: MemoryService): CommandDefinition {
 	return {

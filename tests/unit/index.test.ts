@@ -3,9 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
-import { REGISTRY_KEY } from "../../src/create-memory-service";
-import { HippoMemoryService } from "../../src/hippo-memory-service";
-import hippoMemoryExtension, { type PiExtensionApi } from "../../src/index";
+import { REGISTRY_KEY } from "../../src/create-memory-service.js";
+import { HippoMemoryService } from "../../src/hippo-memory-service.js";
+import hippoMemoryExtension, { type PiExtensionApi } from "../../src/index.js";
 
 interface RegisteredTool {
 	name: string;

@@ -1,6 +1,6 @@
 import { vi } from "vitest";
-import type { MemoryService } from "../../src/memory-service";
-import type { MemoryEntryView } from "../../src/types";
+import type { MemoryService } from "../../src/memory-service.js";
+import type { MemoryEntryView } from "../../src/types.js";
 
 export function createFakeEntry(overrides: Partial<MemoryEntryView> = {}): MemoryEntryView {
 	return {

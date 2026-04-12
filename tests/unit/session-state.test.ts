@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { createSessionState } from "../../src/session-state";
+import { createSessionState } from "../../src/session-state.js";
 
 describe("createSessionState", () => {
 	test("anchor ids round-trip", () => {

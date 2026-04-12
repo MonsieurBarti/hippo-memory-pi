@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { createAllCommands, createToggleStore } from "../../../src/commands";
-import { createFakeService } from "../../fixtures/fake-memory-service";
+import { createAllCommands, createToggleStore } from "../../../src/commands/index.js";
+import { createFakeService } from "../../fixtures/fake-memory-service.js";
 
 describe("createAllCommands", () => {
 	test("returns all 6 commands", () => {

@@ -9,7 +9,7 @@ import hippoMemoryExtension, {
 	createMemoryService,
 	loadConfig,
 	resolveRoots,
-} from "../../src/index";
+} from "../../src/index.js";
 
 describe("hippo-memory-pi library exports", () => {
 	test("default export is still a function", () => {

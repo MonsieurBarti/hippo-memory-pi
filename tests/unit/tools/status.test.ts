@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
-import { createStatusTool } from "../../../src/tools/status";
-import { createFakeService } from "../../fixtures/fake-memory-service";
+import { createStatusTool } from "../../../src/tools/status.js";
+import { createFakeService } from "../../fixtures/fake-memory-service.js";
 
 describe("tff-memory_status tool", () => {
 	test("returns formatted stats", async () => {

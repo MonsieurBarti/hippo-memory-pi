@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import type { PiExtensionApi } from "../../src/index";
+import type { PiExtensionApi } from "../../src/index.js";
 
 interface RegisteredTool {
 	name: string;

@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
-import { createOutcomeTool } from "../../../src/tools/outcome";
-import { createFakeService } from "../../fixtures/fake-memory-service";
+import { createOutcomeTool } from "../../../src/tools/outcome.js";
+import { createFakeService } from "../../fixtures/fake-memory-service.js";
 
 describe("tff-memory_outcome tool", () => {
 	test("forwards id and result to service.outcome", async () => {

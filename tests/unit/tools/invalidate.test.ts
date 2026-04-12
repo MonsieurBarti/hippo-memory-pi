@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
-import { createInvalidateTool } from "../../../src/tools/invalidate";
-import { createFakeService } from "../../fixtures/fake-memory-service";
+import { createInvalidateTool } from "../../../src/tools/invalidate.js";
+import { createFakeService } from "../../fixtures/fake-memory-service.js";
 
 describe("tff-memory_invalidate tool", () => {
 	test("forwards pattern and reason, returns count", async () => {

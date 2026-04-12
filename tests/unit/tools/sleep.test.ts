@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
-import { createSleepTool } from "../../../src/tools/sleep";
-import { createFakeService } from "../../fixtures/fake-memory-service";
+import { createSleepTool } from "../../../src/tools/sleep.js";
+import { createFakeService } from "../../fixtures/fake-memory-service.js";
 
 describe("tff-memory_sleep tool", () => {
 	test("forwards dryRun and formats summary", async () => {

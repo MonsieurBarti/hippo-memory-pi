@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
-import { createInspectTool } from "../../../src/tools/inspect";
-import { createFakeEntry, createFakeService } from "../../fixtures/fake-memory-service";
+import { createInspectTool } from "../../../src/tools/inspect.js";
+import { createFakeEntry, createFakeService } from "../../fixtures/fake-memory-service.js";
 
 describe("tff-memory_inspect tool", () => {
 	test("returns full entry details when found", async () => {

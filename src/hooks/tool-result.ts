@@ -1,6 +1,6 @@
-import type { HippoMemoryConfig } from "../config";
-import type { ErrorCapture, ToolResultLike } from "../error-capture";
-import type { MemoryService } from "../memory-service";
+import type { HippoMemoryConfig } from "../config.js";
+import type { ErrorCapture, ToolResultLike } from "../error-capture.js";
+import type { MemoryService } from "../memory-service.js";
 
 export interface ToolResultHookDeps {
 	service: MemoryService;

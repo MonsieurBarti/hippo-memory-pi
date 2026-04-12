@@ -1,4 +1,4 @@
-import type { ContextResult } from "./types";
+import type { ContextResult } from "./types.js";
 
 export interface InjectionResult {
 	systemPrompt: string;

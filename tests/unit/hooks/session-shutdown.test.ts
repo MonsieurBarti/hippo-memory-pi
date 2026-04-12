@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
-import { DEFAULT_CONFIG } from "../../../src/config";
-import { createSessionShutdownHook } from "../../../src/hooks/session-shutdown";
-import { createFakeService } from "../../fixtures/fake-memory-service";
+import { DEFAULT_CONFIG } from "../../../src/config.js";
+import { createSessionShutdownHook } from "../../../src/hooks/session-shutdown.js";
+import { createFakeService } from "../../fixtures/fake-memory-service.js";
 
 function mockStatus(service: ReturnType<typeof createFakeService>, newSinceLastSleep: number) {
 	const statusMock = vi.mocked(service.status);

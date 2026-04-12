@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
-import { createDecideTool } from "../../../src/tools/decide";
-import { createFakeEntry, createFakeService } from "../../fixtures/fake-memory-service";
+import { createDecideTool } from "../../../src/tools/decide.js";
+import { createFakeEntry, createFakeService } from "../../fixtures/fake-memory-service.js";
 
 describe("tff-memory_decide tool", () => {
 	test("forwards input to service.decide", async () => {

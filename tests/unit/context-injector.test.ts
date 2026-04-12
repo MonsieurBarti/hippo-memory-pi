@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { buildInjection } from "../../src/context-injector";
-import type { ContextResult } from "../../src/types";
+import { buildInjection } from "../../src/context-injector.js";
+import type { ContextResult } from "../../src/types.js";
 
 function fakeContext(overrides: Partial<ContextResult> = {}): ContextResult {
 	return {

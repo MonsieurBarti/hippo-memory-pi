@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
-import { createWmReadTool } from "../../../src/tools/wm-read";
-import { createFakeService } from "../../fixtures/fake-memory-service";
+import { createWmReadTool } from "../../../src/tools/wm-read.js";
+import { createFakeService } from "../../fixtures/fake-memory-service.js";
 
 describe("tff-memory_wm_read tool", () => {
 	test("returns items for scope", async () => {

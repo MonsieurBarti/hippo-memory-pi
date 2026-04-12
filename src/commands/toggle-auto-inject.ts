@@ -1,4 +1,4 @@
-import type { CommandContext, CommandDefinition, ToggleStore } from "./types";
+import type { CommandContext, CommandDefinition, ToggleStore } from "./types.js";
 
 export function createToggleStore(): ToggleStore {
 	let off = false;
