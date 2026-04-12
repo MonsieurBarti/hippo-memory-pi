@@ -225,7 +225,7 @@ describe("extension entry point — registry publish/clear", () => {
 			expect((globalThis as Record<symbol, unknown>)[REGISTRY_KEY]).toBeUndefined();
 		} finally {
 			if (prev === undefined) {
-				process.env.HIPPO_PROJECT_ROOT = undefined;
+				Reflect.deleteProperty(process.env, "HIPPO_PROJECT_ROOT");
 			} else {
 				process.env.HIPPO_PROJECT_ROOT = prev;
 			}
