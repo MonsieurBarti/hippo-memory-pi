@@ -169,7 +169,11 @@ describe("extension entry point — registry publish/clear", () => {
 		(globalThis as Record<symbol, unknown>)[REGISTRY_KEY] = undefined;
 	});
 
-	afterEach(() => {
+	afterEach(async () => {
+		const slot = (globalThis as Record<symbol, unknown>)[REGISTRY_KEY];
+		if (slot instanceof HippoMemoryService && slot.isReady()) {
+			await slot.shutdown();
+		}
 		(globalThis as Record<symbol, unknown>)[REGISTRY_KEY] = undefined;
 		rmSync(tmpCwd, { recursive: true, force: true });
 	});
@@ -203,5 +207,28 @@ describe("extension entry point — registry publish/clear", () => {
 
 		await sessionShutdown?.handler({}, { cwd: tmpCwd });
 		expect((globalThis as Record<symbol, unknown>)[REGISTRY_KEY]).toBeUndefined();
+	});
+
+	test("does not publish when init fails", async () => {
+		// Point the project root at an unwritable path. The service's init()
+		// will throw; session_start's hook catches it and notifies, but
+		// session_start(event, ctx) still resolves normally. Without the
+		// isReady() guard, this would publish a broken service.
+		const prev = process.env.HIPPO_PROJECT_ROOT;
+		process.env.HIPPO_PROJECT_ROOT = "/dev/null/definitely-not-writable";
+		try {
+			const { api, handlers } = createCapturingPiApi(tmpCwd);
+			hippoMemoryExtension(api);
+			const sessionStart = handlers.find((h) => h.event === "session_start");
+			await sessionStart?.handler({ reason: "startup" }, { cwd: tmpCwd });
+
+			expect((globalThis as Record<symbol, unknown>)[REGISTRY_KEY]).toBeUndefined();
+		} finally {
+			if (prev === undefined) {
+				process.env.HIPPO_PROJECT_ROOT = undefined;
+			} else {
+				process.env.HIPPO_PROJECT_ROOT = prev;
+			}
+		}
 	});
 });

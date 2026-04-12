@@ -262,9 +262,12 @@ export default function hippoMemoryExtension(pi: PiExtensionApi): void {
 
 		// Publish the initialized singleton so sibling PI extensions (e.g. TFF)
 		// can reuse it via createMemoryService() without constructing a second
-		// instance against the same SQLite stores. Publishing AFTER sessionStart
-		// awaits guarantees service.init(cwd) has completed.
-		(globalThis as Record<symbol, unknown>)[REGISTRY_KEY] = service;
+		// instance against the same SQLite stores. Only publish when init
+		// succeeded — the session_start hook swallows init errors internally,
+		// so we must recheck isReady() to avoid publishing a broken service.
+		if (service.isReady()) {
+			(globalThis as Record<symbol, unknown>)[REGISTRY_KEY] = service;
+		}
 
 		// Check for extension updates
 		const updateInfo = await checkForUpdates(pi);
