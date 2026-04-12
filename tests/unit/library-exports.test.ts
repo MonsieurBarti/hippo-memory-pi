@@ -144,4 +144,39 @@ describe("createMemoryService — shared instance via registry", () => {
 		expect(prebuilt?.isReady()).toBe(true);
 		expect(handle.service.isReady()).toBe(true);
 	});
+
+	test("ignores a registry value whose isReady() is false and builds a fresh instance", async () => {
+		// prebuilt is a ready service put in the registry by beforeEach. Shut it
+		// down so isReady() returns false; the factory should skip it.
+		if (!prebuilt) throw new Error("prebuilt should be set by beforeEach");
+		await prebuilt.shutdown();
+		(globalThis as Record<symbol, unknown>)[REGISTRY_KEY] = prebuilt;
+
+		const handle = await createMemoryService({ cwd: tmpCwd });
+		try {
+			expect(handle.shared).toBe(false);
+			expect(handle.service).not.toBe(prebuilt);
+			expect(handle.service.isReady()).toBe(true);
+		} finally {
+			await handle.release();
+		}
+	});
+
+	test("ignores a registry value that isn't a HippoMemoryService instance", async () => {
+		// Overwrite the registry with a duck-typed object — it has isReady() and
+		// remember() but is not a HippoMemoryService. The instanceof guard should
+		// reject it.
+		(globalThis as Record<symbol, unknown>)[REGISTRY_KEY] = {
+			isReady: () => true,
+			remember: () => Promise.reject(new Error("not the real thing")),
+		};
+
+		const handle = await createMemoryService({ cwd: tmpCwd });
+		try {
+			expect(handle.shared).toBe(false);
+			expect(handle.service).toBeInstanceOf(HippoMemoryService);
+		} finally {
+			await handle.release();
+		}
+	});
 });
