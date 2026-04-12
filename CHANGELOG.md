@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.6](https://github.com/MonsieurBarti/hippo-memory-pi/compare/hippo-memory-pi-v0.1.5...hippo-memory-pi-v0.1.6) (2026-04-12)
+
+
+### Features
+
+* **skill:** compress hippo-memory skill.md to symbolic level ([06f0273](https://github.com/MonsieurBarti/hippo-memory-pi/commit/06f0273278acfbbfe5f3dea21662fb52f5c9236e))
+* **skill:** compress hippo-memory SKILL.md to symbolic level ([cb816b7](https://github.com/MonsieurBarti/hippo-memory-pi/commit/cb816b70fea84307374191b6b7df17ac6f1bf6a6))
+
 ## [0.1.5](https://github.com/MonsieurBarti/hippo-memory-pi/compare/hippo-memory-pi-v0.1.4...hippo-memory-pi-v0.1.5) (2026-04-12)
 
 
