@@ -100,3 +100,60 @@ describe("createMemoryService — owned instance", () => {
 		expect(handle.service.isReady()).toBe(false);
 	});
 });
+
+describe("createMemoryService — shared instance via registry", () => {
+	let tmpCwd: string;
+	let prebuilt: HippoMemoryService | null = null;
+
+	beforeEach(() => {
+		tmpCwd = mkdtempSync(join(tmpdir(), "hippo-shared-"));
+		(globalThis as Record<symbol, unknown>)[REGISTRY_KEY] = undefined;
+	});
+
+	afterEach(async () => {
+		(globalThis as Record<symbol, unknown>)[REGISTRY_KEY] = undefined;
+		if (prebuilt) {
+			await prebuilt.shutdown();
+			prebuilt = null;
+		}
+		rmSync(tmpCwd, { recursive: true, force: true });
+	});
+
+	test("returns the exact registry instance when it is ready", async () => {
+		const projectRoot = join(tmpCwd, "project");
+		const globalRoot = join(tmpCwd, "global");
+		prebuilt = new HippoMemoryService({
+			...DEFAULT_CONFIG,
+			projectRoot,
+			globalRoot,
+			autoLearnGit: false,
+		});
+		await prebuilt.init(tmpCwd);
+		(globalThis as Record<symbol, unknown>)[REGISTRY_KEY] = prebuilt;
+
+		const handle = await createMemoryService({ cwd: tmpCwd });
+
+		expect(handle.shared).toBe(true);
+		expect(handle.service).toBe(prebuilt);
+		expect(handle.service.isReady()).toBe(true);
+	});
+
+	test("release() is a no-op on a shared handle; original stays ready", async () => {
+		const projectRoot = join(tmpCwd, "project");
+		const globalRoot = join(tmpCwd, "global");
+		prebuilt = new HippoMemoryService({
+			...DEFAULT_CONFIG,
+			projectRoot,
+			globalRoot,
+			autoLearnGit: false,
+		});
+		await prebuilt.init(tmpCwd);
+		(globalThis as Record<symbol, unknown>)[REGISTRY_KEY] = prebuilt;
+
+		const handle = await createMemoryService({ cwd: tmpCwd });
+		await handle.release();
+
+		expect(prebuilt.isReady()).toBe(true);
+		expect(handle.service.isReady()).toBe(true);
+	});
+});
