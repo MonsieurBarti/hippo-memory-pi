@@ -27,6 +27,20 @@ import { createAllTools } from "./tools";
 import { checkForUpdates } from "./update-check.js";
 
 // ---------------------------------------------------------------------------
+// Library-style named exports. These let sibling PI extensions (e.g. TFF) use
+// hippo-memory as a typed library in the same process — via createMemoryService
+// below, which will reuse PI's initialized singleton when available.
+// ---------------------------------------------------------------------------
+
+export { HippoMemoryService } from "./hippo-memory-service";
+export type { MemoryService } from "./memory-service";
+export { DEFAULT_CONFIG, loadConfig } from "./config";
+export type { HippoMemoryConfig } from "./config";
+export { resolveRoots } from "./paths";
+export type { ResolvedRoots } from "./paths";
+export type * from "./types";
+
+// ---------------------------------------------------------------------------
 // Structural PI API — minimal subset of what @mariozechner/pi-coding-agent
 // exposes at runtime. We deliberately avoid importing the real type so this
 // package can be imported and unit-tested without the peer dep installed.
