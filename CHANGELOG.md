@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.1.5](https://github.com/MonsieurBarti/hippo-memory-pi/compare/hippo-memory-pi-v0.1.4...hippo-memory-pi-v0.1.5) (2026-04-12)
+
+
+### Features
+
+* add factory for hippo-memory service with owned-instance lifecycle ([e2cfb5b](https://github.com/MonsieurBarti/hippo-memory-pi/commit/e2cfb5b9a2a948280b34e2cd7035404fa986220d))
+* add named library exports from src/index ([5e94f40](https://github.com/MonsieurBarti/hippo-memory-pi/commit/5e94f4055b9ccae558da9c8301cebb4286b8d4b0))
+* expose hippo-memory service as a library for sibling PI extensions ([cc9476a](https://github.com/MonsieurBarti/hippo-memory-pi/commit/cc9476a87d3500785bee39cf4e8a4c6bc212bce4))
+* publish hippo-memory service to globalthis registry for sibling extensions ([0b524f0](https://github.com/MonsieurBarti/hippo-memory-pi/commit/0b524f0cb909146ff778101bfc62f7e157fc2445))
+
+
+### Bug Fixes
+
+* make release() idempotent and actually exercise process.cwd default in tests ([bc799fd](https://github.com/MonsieurBarti/hippo-memory-pi/commit/bc799fd26159c15a67659fe9e568804e6491e2d4))
+* only publish ready service to registry and clean up test sqlite handles ([f3a8b7d](https://github.com/MonsieurBarti/hippo-memory-pi/commit/f3a8b7d3b3fa81ad6a62635b04ec377ab965d69e))
+* properly delete env var in test restoration path ([7a0ba66](https://github.com/MonsieurBarti/hippo-memory-pi/commit/7a0ba6673abe23443c9a3ec8d1d429660d236cff))
+
 ## [0.1.4](https://github.com/MonsieurBarti/hippo-memory-pi/compare/hippo-memory-pi-v0.1.3...hippo-memory-pi-v0.1.4) (2026-04-11)
 
 
