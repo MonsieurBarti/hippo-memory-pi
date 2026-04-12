@@ -39,6 +39,11 @@ export type { HippoMemoryConfig } from "./config";
 export { resolveRoots } from "./paths";
 export type { ResolvedRoots } from "./paths";
 export type * from "./types";
+export { REGISTRY_KEY, createMemoryService } from "./create-memory-service";
+export type {
+	CreateMemoryServiceOptions,
+	MemoryServiceHandle,
+} from "./create-memory-service";
 
 // ---------------------------------------------------------------------------
 // Structural PI API — minimal subset of what @mariozechner/pi-coding-agent
