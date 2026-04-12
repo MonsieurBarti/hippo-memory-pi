@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.7](https://github.com/MonsieurBarti/hippo-memory-pi/compare/hippo-memory-pi-v0.1.6...hippo-memory-pi-v0.1.7) (2026-04-12)
+
+
+### Bug Fixes
+
+* use explicit .js suffixes on relative imports (esm compliance) ([380eede](https://github.com/MonsieurBarti/hippo-memory-pi/commit/380eedea9e25b2e2a02d821de854433538f27743))
+* use explicit .js suffixes on relative imports (ESM compliance) ([effb497](https://github.com/MonsieurBarti/hippo-memory-pi/commit/effb4970caac55c66e89aeb97460ba525f4f1ad9))
+
 ## [0.1.6](https://github.com/MonsieurBarti/hippo-memory-pi/compare/hippo-memory-pi-v0.1.5...hippo-memory-pi-v0.1.6) (2026-04-12)
 
 
