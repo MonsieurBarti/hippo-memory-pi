@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import hippoMemoryExtension, {
 	DEFAULT_CONFIG,
 	HippoMemoryService,
@@ -76,11 +76,27 @@ describe("createMemoryService — owned instance", () => {
 	});
 
 	test("defaults cwd to process.cwd() when not provided", async () => {
-		const handle = await createMemoryService({ cwd: tmpCwd });
+		const cwdSpy = vi.spyOn(process, "cwd").mockReturnValue(tmpCwd);
 		try {
-			expect(handle.service.isReady()).toBe(true);
+			const handle = await createMemoryService();
+			try {
+				expect(cwdSpy).toHaveBeenCalled();
+				expect(handle.service.isReady()).toBe(true);
+			} finally {
+				await handle.release();
+			}
 		} finally {
-			await handle.release();
+			cwdSpy.mockRestore();
 		}
+	});
+
+	test("release() is idempotent — second call is a no-op", async () => {
+		const handle = await createMemoryService({ cwd: tmpCwd });
+		expect(handle.service.isReady()).toBe(true);
+		await handle.release();
+		expect(handle.service.isReady()).toBe(false);
+		// Second call must not throw and must not re-invoke shutdown.
+		await expect(handle.release()).resolves.toBeUndefined();
+		expect(handle.service.isReady()).toBe(false);
 	});
 });

@@ -18,10 +18,10 @@ export interface MemoryServiceHandle {
 	/** The live service. Use freely — it's already initialized. */
 	service: HippoMemoryService;
 	/**
-	 * Release the handle. Safe to call exactly once.
-	 * - When `shared` is `false`, this calls `service.shutdown()`.
-	 * - When `shared` is `true`, this is a no-op — the PI extension owns the
-	 *   lifecycle and will shut the service down on `session_shutdown`.
+	 * Release the handle. Idempotent — calling more than once is a safe no-op.
+	 * - When `shared` is `false`, the first call runs `service.shutdown()`.
+	 * - When `shared` is `true`, this is always a no-op — the PI extension owns
+	 *   the lifecycle and will shut the service down on `session_shutdown`.
 	 */
 	release: () => Promise<void>;
 	/**
@@ -51,9 +51,13 @@ export async function createMemoryService(
 	const registry = globalThis as Record<symbol, unknown>;
 	const existing = registry[REGISTRY_KEY];
 	if (existing instanceof HippoMemoryService && existing.isReady()) {
+		let released = false;
 		return {
 			service: existing,
-			release: async () => {},
+			release: async () => {
+				if (released) return;
+				released = true;
+			},
 			shared: true,
 		};
 	}
@@ -65,9 +69,14 @@ export async function createMemoryService(
 	const service = new HippoMemoryService(config);
 	await service.init(cwd);
 
+	let released = false;
 	return {
 		service,
-		release: () => service.shutdown(),
+		release: async () => {
+			if (released) return;
+			released = true;
+			await service.shutdown();
+		},
 		shared: false,
 	};
 }
