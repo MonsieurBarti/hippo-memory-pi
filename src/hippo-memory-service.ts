@@ -47,9 +47,9 @@ interface HippoConflictRow {
 	detected_at: string;
 	updated_at: string;
 }
-import type { HippoMemoryConfig } from "./config";
-import type { MemoryService } from "./memory-service";
-import { Mutex } from "./mutex";
+import type { HippoMemoryConfig } from "./config.js";
+import type { MemoryService } from "./memory-service.js";
+import { Mutex } from "./mutex.js";
 import type {
 	AutoShareResult,
 	ConfidenceLevel,
@@ -72,7 +72,7 @@ import type {
 	RememberInput,
 	ShareResult,
 	WorkingMemoryItem,
-} from "./types";
+} from "./types.js";
 
 /**
  * Convert hippo's `Layer` enum value (runtime: string "buffer"/"episodic"/

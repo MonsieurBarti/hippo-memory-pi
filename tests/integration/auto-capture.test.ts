@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import hippoMemoryExtension from "../../src/index";
-import { type FakePiApi, createFakePiApi } from "../fixtures/fake-pi-api";
-import { type TmpRoots, createTmpRoots } from "../fixtures/tmp-store";
+import hippoMemoryExtension from "../../src/index.js";
+import { type FakePiApi, createFakePiApi } from "../fixtures/fake-pi-api.js";
+import { type TmpRoots, createTmpRoots } from "../fixtures/tmp-store.js";
 
 describe("error auto-capture (integration)", () => {
 	let roots: TmpRoots;

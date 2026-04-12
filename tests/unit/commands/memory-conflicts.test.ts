@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
-import { createMemoryConflictsCommand } from "../../../src/commands/memory-conflicts";
-import { createFakeCommandContext } from "../../fixtures/fake-command-context";
-import { createFakeService } from "../../fixtures/fake-memory-service";
+import { createMemoryConflictsCommand } from "../../../src/commands/memory-conflicts.js";
+import { createFakeCommandContext } from "../../fixtures/fake-command-context.js";
+import { createFakeService } from "../../fixtures/fake-memory-service.js";
 
 describe("/memory-conflicts command", () => {
 	test("reports empty state cleanly", async () => {

@@ -1,6 +1,6 @@
 import { homedir } from "node:os";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { resolveRoots } from "../../src/paths";
+import { resolveRoots } from "../../src/paths.js";
 
 describe("resolveRoots", () => {
 	const originalEnv = { ...process.env };

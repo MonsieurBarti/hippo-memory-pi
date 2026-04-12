@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { DEFAULT_CONFIG } from "../../src/config";
-import { HippoMemoryService } from "../../src/hippo-memory-service";
-import { type TmpRoots, createTmpRoots } from "../fixtures/tmp-store";
+import { DEFAULT_CONFIG } from "../../src/config.js";
+import { HippoMemoryService } from "../../src/hippo-memory-service.js";
+import { type TmpRoots, createTmpRoots } from "../fixtures/tmp-store.js";
 
 function makeService(roots: TmpRoots) {
 	return new HippoMemoryService({

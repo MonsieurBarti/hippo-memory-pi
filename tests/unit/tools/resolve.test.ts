@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
-import { createResolveTool } from "../../../src/tools/resolve";
-import { createFakeService } from "../../fixtures/fake-memory-service";
+import { createResolveTool } from "../../../src/tools/resolve.js";
+import { createFakeService } from "../../fixtures/fake-memory-service.js";
 
 describe("tff-memory_resolve tool", () => {
 	test("forwards conflictId and keep choice", async () => {

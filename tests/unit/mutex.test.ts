@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { Mutex } from "../../src/mutex";
+import { Mutex } from "../../src/mutex.js";
 
 describe("Mutex", () => {
 	test("serializes concurrent runs", async () => {

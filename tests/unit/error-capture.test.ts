@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from "vitest";
-import { ErrorCapture, type ToolResultLike } from "../../src/error-capture";
+import { ErrorCapture, type ToolResultLike } from "../../src/error-capture.js";
 
 function fakeEvent(over: Partial<ToolResultLike> = {}): ToolResultLike {
 	return {

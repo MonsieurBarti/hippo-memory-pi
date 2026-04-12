@@ -1,7 +1,7 @@
 import { type Static, Type } from "@sinclair/typebox";
-import type { MemoryService } from "../memory-service";
-import type { RecallOptions } from "../types";
-import type { ToolDefinition, ToolExecuteResult } from "./types";
+import type { MemoryService } from "../memory-service.js";
+import type { RecallOptions } from "../types.js";
+import type { ToolDefinition, ToolExecuteResult } from "./types.js";
 
 export const RecallParams = Type.Object({
 	query: Type.String({ description: "Search query" }),

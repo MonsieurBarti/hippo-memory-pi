@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
-import { createPinTool } from "../../../src/tools/pin";
-import { createFakeService } from "../../fixtures/fake-memory-service";
+import { createPinTool } from "../../../src/tools/pin.js";
+import { createFakeService } from "../../fixtures/fake-memory-service.js";
 
 describe("tff-memory_pin tool", () => {
 	test("pins a memory", async () => {

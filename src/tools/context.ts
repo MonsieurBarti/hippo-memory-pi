@@ -1,7 +1,7 @@
 import { type Static, Type } from "@sinclair/typebox";
-import type { MemoryService } from "../memory-service";
-import type { ContextOptions } from "../types";
-import type { ToolDefinition, ToolExecuteResult } from "./types";
+import type { MemoryService } from "../memory-service.js";
+import type { ContextOptions } from "../types.js";
+import type { ToolDefinition, ToolExecuteResult } from "./types.js";
 
 export const ContextParams = Type.Object({
 	query: Type.Optional(Type.String()),

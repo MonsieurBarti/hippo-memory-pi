@@ -2,8 +2,8 @@ import { describe, expect, test } from "vitest";
 import {
 	createToggleAutoInjectCommand,
 	createToggleStore,
-} from "../../../src/commands/toggle-auto-inject";
-import { createFakeCommandContext } from "../../fixtures/fake-command-context";
+} from "../../../src/commands/toggle-auto-inject.js";
+import { createFakeCommandContext } from "../../fixtures/fake-command-context.js";
 
 describe("createToggleStore", () => {
 	test("starts in the ON state (not toggled off)", () => {

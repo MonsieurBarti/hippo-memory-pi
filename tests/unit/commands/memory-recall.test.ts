@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
-import { createMemoryRecallCommand } from "../../../src/commands/memory-recall";
-import { createFakeCommandContext } from "../../fixtures/fake-command-context";
-import { createFakeEntry, createFakeService } from "../../fixtures/fake-memory-service";
+import { createMemoryRecallCommand } from "../../../src/commands/memory-recall.js";
+import { createFakeCommandContext } from "../../fixtures/fake-command-context.js";
+import { createFakeEntry, createFakeService } from "../../fixtures/fake-memory-service.js";
 
 describe("/memory-recall command", () => {
 	test("notifies usage when query is empty", async () => {

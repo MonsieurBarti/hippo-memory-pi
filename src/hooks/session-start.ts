@@ -1,5 +1,5 @@
-import type { HippoMemoryConfig } from "../config";
-import type { MemoryService } from "../memory-service";
+import type { HippoMemoryConfig } from "../config.js";
+import type { MemoryService } from "../memory-service.js";
 
 export type NotifyLevel = "info" | "warning" | "error";
 export type NotifyFn = (message: string, level?: NotifyLevel) => void;

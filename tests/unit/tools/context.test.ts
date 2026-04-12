@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
-import { createContextTool } from "../../../src/tools/context";
-import { createFakeService } from "../../fixtures/fake-memory-service";
+import { createContextTool } from "../../../src/tools/context.js";
+import { createFakeService } from "../../fixtures/fake-memory-service.js";
 
 describe("tff-memory_context tool", () => {
 	test("returns summary when context has ids", async () => {

@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
-import { createForgetTool } from "../../../src/tools/forget";
-import { createFakeService } from "../../fixtures/fake-memory-service";
+import { createForgetTool } from "../../../src/tools/forget.js";
+import { createFakeService } from "../../fixtures/fake-memory-service.js";
 
 describe("tff-memory_forget tool", () => {
 	test("forwards id to service.forget", async () => {

@@ -1,8 +1,8 @@
 import { describe, expect, test, vi } from "vitest";
-import { DEFAULT_CONFIG } from "../../../src/config";
-import { createAgentEndHook } from "../../../src/hooks/agent-end";
-import { SuccessDetector, type ToolResultSummary } from "../../../src/success-detector";
-import { createFakeService } from "../../fixtures/fake-memory-service";
+import { DEFAULT_CONFIG } from "../../../src/config.js";
+import { createAgentEndHook } from "../../../src/hooks/agent-end.js";
+import { SuccessDetector, type ToolResultSummary } from "../../../src/success-detector.js";
+import { createFakeService } from "../../fixtures/fake-memory-service.js";
 
 function makeDeps(options: {
 	anchors?: readonly string[];

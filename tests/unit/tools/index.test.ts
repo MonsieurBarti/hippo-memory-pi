@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { createAllTools } from "../../../src/tools";
-import { createFakeService } from "../../fixtures/fake-memory-service";
+import { createAllTools } from "../../../src/tools/index.js";
+import { createFakeService } from "../../fixtures/fake-memory-service.js";
 
 describe("createAllTools", () => {
 	test("returns all 17 tools with tff-memory_ prefix", () => {

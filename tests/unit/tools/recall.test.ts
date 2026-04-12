@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
-import { createRecallTool } from "../../../src/tools/recall";
-import { createFakeEntry, createFakeService } from "../../fixtures/fake-memory-service";
+import { createRecallTool } from "../../../src/tools/recall.js";
+import { createFakeEntry, createFakeService } from "../../fixtures/fake-memory-service.js";
 
 describe("tff-memory_recall tool", () => {
 	test("forwards query and options, formats response", async () => {

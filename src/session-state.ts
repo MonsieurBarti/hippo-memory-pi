@@ -1,4 +1,4 @@
-import type { ToolResultSummary } from "./success-detector";
+import type { ToolResultSummary } from "./success-detector.js";
 
 export interface SessionState {
 	setAnchorIds(ids: readonly string[]): void;

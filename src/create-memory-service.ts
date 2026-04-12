@@ -1,6 +1,6 @@
-import { loadConfig } from "./config";
-import { HippoMemoryService } from "./hippo-memory-service";
-import { resolveRoots } from "./paths";
+import { loadConfig } from "./config.js";
+import { HippoMemoryService } from "./hippo-memory-service.js";
+import { resolveRoots } from "./paths.js";
 
 /**
  * `globalThis` slot where `hippoMemoryExtension` publishes its initialized

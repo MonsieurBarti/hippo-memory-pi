@@ -1,24 +1,24 @@
-import type { MemoryService } from "../memory-service";
-import { createConflictsTool } from "./conflicts";
-import { createContextTool } from "./context";
-import { createDecideTool } from "./decide";
-import { createForgetTool } from "./forget";
-import { createInspectTool } from "./inspect";
-import { createInvalidateTool } from "./invalidate";
-import { createLearnGitTool } from "./learn-git";
-import { createOutcomeTool } from "./outcome";
-import { createPinTool } from "./pin";
-import { createRecallTool } from "./recall";
-import { createRememberTool } from "./remember";
-import { createResolveTool } from "./resolve";
-import { createShareTool } from "./share";
-import { createSleepTool } from "./sleep";
-import { createStatusTool } from "./status";
-import type { ToolDefinition } from "./types";
-import { createWmPushTool } from "./wm-push";
-import { createWmReadTool } from "./wm-read";
+import type { MemoryService } from "../memory-service.js";
+import { createConflictsTool } from "./conflicts.js";
+import { createContextTool } from "./context.js";
+import { createDecideTool } from "./decide.js";
+import { createForgetTool } from "./forget.js";
+import { createInspectTool } from "./inspect.js";
+import { createInvalidateTool } from "./invalidate.js";
+import { createLearnGitTool } from "./learn-git.js";
+import { createOutcomeTool } from "./outcome.js";
+import { createPinTool } from "./pin.js";
+import { createRecallTool } from "./recall.js";
+import { createRememberTool } from "./remember.js";
+import { createResolveTool } from "./resolve.js";
+import { createShareTool } from "./share.js";
+import { createSleepTool } from "./sleep.js";
+import { createStatusTool } from "./status.js";
+import type { ToolDefinition } from "./types.js";
+import { createWmPushTool } from "./wm-push.js";
+import { createWmReadTool } from "./wm-read.js";
 
-export type { ToolDefinition, ToolDetailValue, ToolExecuteResult } from "./types";
+export type { ToolDefinition, ToolDetailValue, ToolExecuteResult } from "./types.js";
 
 export function createAllTools(service: MemoryService): ToolDefinition[] {
 	return [

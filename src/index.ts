@@ -3,28 +3,31 @@ import { fileURLToPath } from "node:url";
 import type { TObject } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 
-import type { CommandContext, CommandDefinition } from "./commands";
-import { createAllCommands, createToggleStore } from "./commands";
-import { loadConfig } from "./config";
-import { REGISTRY_KEY } from "./create-memory-service";
-import { ErrorCapture, type ToolResultLike } from "./error-capture";
-import { HippoMemoryService } from "./hippo-memory-service";
-import { type AgentEndEvent, createAgentEndHook } from "./hooks/agent-end";
-import { type BeforeAgentStartEvent, createBeforeAgentStartHook } from "./hooks/before-agent-start";
-import { createSessionShutdownHook } from "./hooks/session-shutdown";
+import type { CommandContext, CommandDefinition } from "./commands/index.js";
+import { createAllCommands, createToggleStore } from "./commands/index.js";
+import { loadConfig } from "./config.js";
+import { REGISTRY_KEY } from "./create-memory-service.js";
+import { ErrorCapture, type ToolResultLike } from "./error-capture.js";
+import { HippoMemoryService } from "./hippo-memory-service.js";
+import { type AgentEndEvent, createAgentEndHook } from "./hooks/agent-end.js";
+import {
+	type BeforeAgentStartEvent,
+	createBeforeAgentStartHook,
+} from "./hooks/before-agent-start.js";
+import { createSessionShutdownHook } from "./hooks/session-shutdown.js";
 import {
 	type NotifyFn,
 	type NotifyLevel,
 	type SessionStartContext,
 	type SessionStartEvent,
 	createSessionStartHook,
-} from "./hooks/session-start";
-import { createToolResultHook } from "./hooks/tool-result";
-import { resolveRoots } from "./paths";
-import { createSessionState } from "./session-state";
-import { SuccessDetector } from "./success-detector";
-import type { ToolDefinition } from "./tools";
-import { createAllTools } from "./tools";
+} from "./hooks/session-start.js";
+import { createToolResultHook } from "./hooks/tool-result.js";
+import { resolveRoots } from "./paths.js";
+import { createSessionState } from "./session-state.js";
+import { SuccessDetector } from "./success-detector.js";
+import type { ToolDefinition } from "./tools/index.js";
+import { createAllTools } from "./tools/index.js";
 import { checkForUpdates } from "./update-check.js";
 
 // ---------------------------------------------------------------------------
@@ -33,18 +36,18 @@ import { checkForUpdates } from "./update-check.js";
 // below, which will reuse PI's initialized singleton when available.
 // ---------------------------------------------------------------------------
 
-export { HippoMemoryService } from "./hippo-memory-service";
-export type { MemoryService } from "./memory-service";
-export { DEFAULT_CONFIG, loadConfig } from "./config";
-export type { HippoMemoryConfig } from "./config";
-export { resolveRoots } from "./paths";
-export type { ResolvedRoots } from "./paths";
-export type * from "./types";
-export { REGISTRY_KEY, createMemoryService } from "./create-memory-service";
+export { HippoMemoryService } from "./hippo-memory-service.js";
+export type { MemoryService } from "./memory-service.js";
+export { DEFAULT_CONFIG, loadConfig } from "./config.js";
+export type { HippoMemoryConfig } from "./config.js";
+export { resolveRoots } from "./paths.js";
+export type { ResolvedRoots } from "./paths.js";
+export type * from "./types.js";
+export { REGISTRY_KEY, createMemoryService } from "./create-memory-service.js";
 export type {
 	CreateMemoryServiceOptions,
 	MemoryServiceHandle,
-} from "./create-memory-service";
+} from "./create-memory-service.js";
 
 // ---------------------------------------------------------------------------
 // Structural PI API — minimal subset of what @mariozechner/pi-coding-agent

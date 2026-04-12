@@ -1,6 +1,6 @@
-import type { HippoMemoryConfig } from "../config";
-import type { MemoryService } from "../memory-service";
-import type { NotifyFn } from "./session-start";
+import type { HippoMemoryConfig } from "../config.js";
+import type { MemoryService } from "../memory-service.js";
+import type { NotifyFn } from "./session-start.js";
 
 export interface SessionShutdownDeps {
 	service: MemoryService;

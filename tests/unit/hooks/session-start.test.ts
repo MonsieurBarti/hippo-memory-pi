@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
-import { DEFAULT_CONFIG } from "../../../src/config";
-import { createSessionStartHook } from "../../../src/hooks/session-start";
-import { createFakeService } from "../../fixtures/fake-memory-service";
+import { DEFAULT_CONFIG } from "../../../src/config.js";
+import { createSessionStartHook } from "../../../src/hooks/session-start.js";
+import { createFakeService } from "../../fixtures/fake-memory-service.js";
 
 describe("session-start hook", () => {
 	test("calls service.init with the provided cwd", async () => {

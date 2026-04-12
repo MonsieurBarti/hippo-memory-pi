@@ -1,8 +1,8 @@
 import { describe, expect, test, vi } from "vitest";
-import { DEFAULT_CONFIG } from "../../../src/config";
-import { ErrorCapture, type ToolResultLike } from "../../../src/error-capture";
-import { createToolResultHook } from "../../../src/hooks/tool-result";
-import { createFakeService } from "../../fixtures/fake-memory-service";
+import { DEFAULT_CONFIG } from "../../../src/config.js";
+import { ErrorCapture, type ToolResultLike } from "../../../src/error-capture.js";
+import { createToolResultHook } from "../../../src/hooks/tool-result.js";
+import { createFakeService } from "../../fixtures/fake-memory-service.js";
 
 function errorEvent(): ToolResultLike {
 	return {

@@ -1,7 +1,7 @@
-import type { HippoMemoryConfig } from "../config";
-import { type InjectionResult, buildInjection } from "../context-injector";
-import type { MemoryService } from "../memory-service";
-import type { ContextOptions } from "../types";
+import type { HippoMemoryConfig } from "../config.js";
+import { type InjectionResult, buildInjection } from "../context-injector.js";
+import type { MemoryService } from "../memory-service.js";
+import type { ContextOptions } from "../types.js";
 
 export interface BeforeAgentStartEvent {
 	prompt: string;

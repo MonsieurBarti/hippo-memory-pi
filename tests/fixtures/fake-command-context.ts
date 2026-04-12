@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import type { CommandContext } from "../../src/commands/types";
+import type { CommandContext } from "../../src/commands/types.js";
 
 export interface FakeCommandContext extends CommandContext {
 	readonly notifications: ReadonlyArray<{ message: string; level: "info" | "warning" | "error" }>;
