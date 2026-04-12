@@ -6,6 +6,7 @@ import { Value } from "@sinclair/typebox/value";
 import type { CommandContext, CommandDefinition } from "./commands";
 import { createAllCommands, createToggleStore } from "./commands";
 import { loadConfig } from "./config";
+import { REGISTRY_KEY } from "./create-memory-service";
 import { ErrorCapture, type ToolResultLike } from "./error-capture";
 import { HippoMemoryService } from "./hippo-memory-service";
 import { type AgentEndEvent, createAgentEndHook } from "./hooks/agent-end";
@@ -25,6 +26,25 @@ import { SuccessDetector } from "./success-detector";
 import type { ToolDefinition } from "./tools";
 import { createAllTools } from "./tools";
 import { checkForUpdates } from "./update-check.js";
+
+// ---------------------------------------------------------------------------
+// Library-style named exports. These let sibling PI extensions (e.g. TFF) use
+// hippo-memory as a typed library in the same process — via createMemoryService
+// below, which will reuse PI's initialized singleton when available.
+// ---------------------------------------------------------------------------
+
+export { HippoMemoryService } from "./hippo-memory-service";
+export type { MemoryService } from "./memory-service";
+export { DEFAULT_CONFIG, loadConfig } from "./config";
+export type { HippoMemoryConfig } from "./config";
+export { resolveRoots } from "./paths";
+export type { ResolvedRoots } from "./paths";
+export type * from "./types";
+export { REGISTRY_KEY, createMemoryService } from "./create-memory-service";
+export type {
+	CreateMemoryServiceOptions,
+	MemoryServiceHandle,
+} from "./create-memory-service";
 
 // ---------------------------------------------------------------------------
 // Structural PI API — minimal subset of what @mariozechner/pi-coding-agent
@@ -240,6 +260,15 @@ export default function hippoMemoryExtension(pi: PiExtensionApi): void {
 		if (!isSessionStartCtx(ctx)) return;
 		await sessionStart(event, ctx);
 
+		// Publish the initialized singleton so sibling PI extensions (e.g. TFF)
+		// can reuse it via createMemoryService() without constructing a second
+		// instance against the same SQLite stores. Only publish when init
+		// succeeded — the session_start hook swallows init errors internally,
+		// so we must recheck isReady() to avoid publishing a broken service.
+		if (service.isReady()) {
+			(globalThis as Record<symbol, unknown>)[REGISTRY_KEY] = service;
+		}
+
 		// Check for extension updates
 		const updateInfo = await checkForUpdates(pi);
 		if (updateInfo?.updateAvailable) {
@@ -251,6 +280,11 @@ export default function hippoMemoryExtension(pi: PiExtensionApi): void {
 	});
 
 	pi.on("session_shutdown", async (event, ctx) => {
+		// Clear the registry FIRST so that a concurrent external caller can't
+		// grab this instance while shutdown is in progress. createMemoryService
+		// will either see no slot and build fresh, or see a not-ready instance
+		// and build fresh — both are correct.
+		(globalThis as Record<symbol, unknown>)[REGISTRY_KEY] = undefined;
 		await sessionShutdown(event, ctx);
 	});
 
