@@ -6,6 +6,7 @@ import { Value } from "@sinclair/typebox/value";
 import type { CommandContext, CommandDefinition } from "./commands";
 import { createAllCommands, createToggleStore } from "./commands";
 import { loadConfig } from "./config";
+import { REGISTRY_KEY } from "./create-memory-service";
 import { ErrorCapture, type ToolResultLike } from "./error-capture";
 import { HippoMemoryService } from "./hippo-memory-service";
 import { type AgentEndEvent, createAgentEndHook } from "./hooks/agent-end";
@@ -259,6 +260,12 @@ export default function hippoMemoryExtension(pi: PiExtensionApi): void {
 		if (!isSessionStartCtx(ctx)) return;
 		await sessionStart(event, ctx);
 
+		// Publish the initialized singleton so sibling PI extensions (e.g. TFF)
+		// can reuse it via createMemoryService() without constructing a second
+		// instance against the same SQLite stores. Publishing AFTER sessionStart
+		// awaits guarantees service.init(cwd) has completed.
+		(globalThis as Record<symbol, unknown>)[REGISTRY_KEY] = service;
+
 		// Check for extension updates
 		const updateInfo = await checkForUpdates(pi);
 		if (updateInfo?.updateAvailable) {
@@ -270,6 +277,11 @@ export default function hippoMemoryExtension(pi: PiExtensionApi): void {
 	});
 
 	pi.on("session_shutdown", async (event, ctx) => {
+		// Clear the registry FIRST so that a concurrent external caller can't
+		// grab this instance while shutdown is in progress. createMemoryService
+		// will either see no slot and build fresh, or see a not-ready instance
+		// and build fresh — both are correct.
+		(globalThis as Record<symbol, unknown>)[REGISTRY_KEY] = undefined;
 		await sessionShutdown(event, ctx);
 	});
 

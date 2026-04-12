@@ -6,7 +6,8 @@ import { resolveRoots } from "./paths";
  * `globalThis` slot where `hippoMemoryExtension` publishes its initialized
  * singleton. External callers (sibling PI extensions) should NOT read this
  * directly — use `createMemoryService()` instead, which guards for type,
- * readiness, and shutdown-safety. Exported only for tests and diagnostics.
+ * readiness, and shutdown-safety. Exported so the PI extension itself can
+ * publish/clear the slot, and so tests can stub it.
  */
 export const REGISTRY_KEY = Symbol.for("@the-forge-flow/hippo-memory-pi/service");
 

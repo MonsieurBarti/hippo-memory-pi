@@ -3,6 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
+import { REGISTRY_KEY } from "../../src/create-memory-service";
+import { HippoMemoryService } from "../../src/hippo-memory-service";
 import hippoMemoryExtension, { type PiExtensionApi } from "../../src/index";
 
 interface RegisteredTool {
@@ -156,5 +158,50 @@ describe("extension entry point", () => {
 		expect(toggle).toBeDefined();
 		// No ui field at all — should not throw.
 		await expect(toggle?.handler("", { cwd: tmpCwd })).resolves.toBeUndefined();
+	});
+});
+
+describe("extension entry point — registry publish/clear", () => {
+	let tmpCwd: string;
+
+	beforeEach(() => {
+		tmpCwd = mkdtempSync(join(tmpdir(), "hippo-registry-"));
+		(globalThis as Record<symbol, unknown>)[REGISTRY_KEY] = undefined;
+	});
+
+	afterEach(() => {
+		(globalThis as Record<symbol, unknown>)[REGISTRY_KEY] = undefined;
+		rmSync(tmpCwd, { recursive: true, force: true });
+	});
+
+	test("publishes the ready service to the registry after session_start", async () => {
+		const { api, handlers } = createCapturingPiApi(tmpCwd);
+		hippoMemoryExtension(api);
+
+		const sessionStart = handlers.find((h) => h.event === "session_start");
+		expect(sessionStart).toBeDefined();
+		await sessionStart?.handler({ reason: "startup" }, { cwd: tmpCwd });
+
+		const slot = (globalThis as Record<symbol, unknown>)[REGISTRY_KEY];
+		expect(slot).toBeInstanceOf(HippoMemoryService);
+		expect((slot as HippoMemoryService).isReady()).toBe(true);
+	});
+
+	test("clears the registry at the start of session_shutdown", async () => {
+		const { api, handlers } = createCapturingPiApi(tmpCwd);
+		hippoMemoryExtension(api);
+
+		const sessionStart = handlers.find((h) => h.event === "session_start");
+		const sessionShutdown = handlers.find((h) => h.event === "session_shutdown");
+		expect(sessionStart).toBeDefined();
+		expect(sessionShutdown).toBeDefined();
+
+		await sessionStart?.handler({ reason: "startup" }, { cwd: tmpCwd });
+		expect((globalThis as Record<symbol, unknown>)[REGISTRY_KEY]).toBeInstanceOf(
+			HippoMemoryService,
+		);
+
+		await sessionShutdown?.handler({}, { cwd: tmpCwd });
+		expect((globalThis as Record<symbol, unknown>)[REGISTRY_KEY]).toBeUndefined();
 	});
 });
