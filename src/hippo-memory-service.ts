@@ -22,7 +22,7 @@ import {
 	hybridSearch,
 	initStore,
 	listMemoryConflicts,
-	loadAllEntries,
+	loadSearchEntries,
 	markRetrieved,
 	promoteToGlobal,
 	readEntry,
@@ -30,6 +30,13 @@ import {
 	wmFlush,
 	writeEntry,
 } from "hippo-memory";
+
+/**
+ * Column list for SELECT queries. Mirrors hippo-memory's internal constant
+ * since it's not exported. Keep in sync with hippo-memory updates.
+ */
+const MEMORY_SELECT_COLUMNS =
+	"id, created, last_retrieved, retrieval_count, strength, half_life_days, layer, tags_json, emotional_valence, schema_fit, source, outcome_score, outcome_positive, outcome_negative, conflicts_with_json, pinned, confidence, content";
 
 /**
  * Shape of a single row returned by `listMemoryConflicts`. hippo-memory
@@ -241,6 +248,10 @@ export class HippoMemoryService implements MemoryService {
 		const limit = opts.limit ?? this.config.recallLimit;
 		const scope = opts.scope ?? "both";
 		const mode = this.config.searchMode;
+		// Use FTS5-indexed search candidate limit. This dramatically reduces
+		// memory overhead for large stores by pre-filtering via SQLite FTS5
+		// instead of loading all entries into memory.
+		const searchCandidateLimit = this.config.searchCandidateLimit;
 
 		interface RawHit {
 			result: SearchResult;
@@ -248,7 +259,9 @@ export class HippoMemoryService implements MemoryService {
 		}
 
 		const runSearch = async (root: string, rootLabel: MemoryRoot): Promise<RawHit[]> => {
-			const entries = loadAllEntries(root);
+			// Use loadSearchEntries which leverages FTS5 for indexed search.
+			// Falls back to LIKE matching, then full-store scan.
+			const entries = loadSearchEntries(root, query, searchCandidateLimit);
 			const raw =
 				mode === "hybrid"
 					? await hybridSearch(query, entries, { budget })
@@ -434,23 +447,18 @@ export class HippoMemoryService implements MemoryService {
 	async invalidate(pattern: string, reason?: string): Promise<number> {
 		return this.withWrite(async () => {
 			const project = this.requireProjectRoot();
-			const all: MemoryEntry[] = loadAllEntries(project);
-			const lower = pattern.toLowerCase();
-			const cap = 1000;
+			// Use SQL LIKE to pre-filter candidates instead of loading all entries.
+			// This dramatically reduces memory overhead for large stores.
+			const candidates = this.findEntriesByPattern(project, pattern, 1000);
 			let weakened = 0;
-			for (const entry of all) {
-				if (weakened >= cap) break;
-				const content = entry.content.toLowerCase();
-				const tagsText = entry.tags.join(" ").toLowerCase();
-				if (content.includes(lower) || tagsText.includes(lower)) {
-					entry.strength = Math.max(0, entry.strength * 0.25);
-					entry.half_life_days = Math.max(0.5, entry.half_life_days * 0.5);
-					if (reason) {
-						entry.tags = [...entry.tags, `invalidated:${reason}`];
-					}
-					writeEntry(project, entry);
-					weakened++;
+			for (const entry of candidates) {
+				entry.strength = Math.max(0, entry.strength * 0.25);
+				entry.half_life_days = Math.max(0.5, entry.half_life_days * 0.5);
+				if (reason) {
+					entry.tags = [...entry.tags, `invalidated:${reason}`];
 				}
+				writeEntry(project, entry);
+				weakened++;
 			}
 			return weakened;
 		});
@@ -511,28 +519,25 @@ export class HippoMemoryService implements MemoryService {
 	async status(): Promise<MemoryStatus> {
 		const project = this.requireProjectRoot();
 		const globalRoot = this.getGlobalRoot();
-		const projectEntries: MemoryEntry[] = loadAllEntries(project);
-		const globalEntries: MemoryEntry[] = globalRoot ? loadAllEntries(globalRoot) : [];
 
-		const episodic = projectEntries.filter((e) => e.layer === Layer.Episodic).length;
-		const semantic = projectEntries.filter((e) => e.layer === Layer.Semantic).length;
-		const buffer = projectEntries.filter((e) => e.layer === Layer.Buffer).length;
-		const averageStrength =
-			projectEntries.length > 0
-				? projectEntries.reduce((acc, e) => acc + e.strength, 0) / projectEntries.length
-				: 0;
+		// Use SQL COUNT queries instead of loading all entries into memory.
+		// This is O(1) regardless of store size, vs O(n) for loadAllEntries.
+		const projectStats = this.loadStoreStats(project);
+		const globalStats = globalRoot
+			? this.loadStoreStats(globalRoot)
+			: { total: 0, episodic: 0, semantic: 0, buffer: 0, avgStrength: 0 };
 
 		// Read persistent sleep metrics from hippo's SQLite tables rather than
 		// relying on in-process counters that reset between sessions.
 		const { newSinceLastSleep, lastSleepAt } = this.loadSleepMetrics(project);
 
 		return {
-			projectTotal: projectEntries.length,
-			globalTotal: globalEntries.length,
-			episodic,
-			semantic,
-			buffer,
-			averageStrength,
+			projectTotal: projectStats.total,
+			globalTotal: globalStats.total,
+			episodic: projectStats.episodic,
+			semantic: projectStats.semantic,
+			buffer: projectStats.buffer,
+			averageStrength: projectStats.avgStrength,
 			newSinceLastSleep,
 			lastSleepAt,
 			searchMode: this.config.searchMode,
@@ -725,6 +730,158 @@ export class HippoMemoryService implements MemoryService {
 			return { newSinceLastSleep, lastSleepAt };
 		} catch {
 			return { newSinceLastSleep: 0, lastSleepAt: null };
+		}
+	}
+
+	/**
+	 * Load store statistics via SQL COUNT queries.
+	 * O(1) regardless of store size — avoids loading all entries into memory.
+	 */
+	private loadStoreStats(root: string): {
+		total: number;
+		episodic: number;
+		semantic: number;
+		buffer: number;
+		avgStrength: number;
+	} {
+		try {
+			const nodeRequire = createRequire(import.meta.url);
+			const { DatabaseSync } = nodeRequire("node:sqlite") as {
+				DatabaseSync: new (
+					path: string,
+					options?: { open?: boolean },
+				) => {
+					prepare(sql: string): {
+						get(...params: unknown[]): { [key: string]: unknown } | undefined;
+					};
+					close(): void;
+				};
+			};
+
+			const dbPath = join(root, "hippo.db");
+			const db = new DatabaseSync(dbPath, { open: true });
+
+			// Total count
+			const totalRow = db.prepare("SELECT COUNT(*) as cnt FROM memories").get();
+			const total = typeof totalRow?.cnt === "number" ? totalRow.cnt : 0;
+
+			// Layer counts
+			const episodicRow = db
+				.prepare("SELECT COUNT(*) as cnt FROM memories WHERE layer = 'episodic'")
+				.get();
+			const episodic = typeof episodicRow?.cnt === "number" ? episodicRow.cnt : 0;
+
+			const semanticRow = db
+				.prepare("SELECT COUNT(*) as cnt FROM memories WHERE layer = 'semantic'")
+				.get();
+			const semantic = typeof semanticRow?.cnt === "number" ? semanticRow.cnt : 0;
+
+			const bufferRow = db
+				.prepare("SELECT COUNT(*) as cnt FROM memories WHERE layer = 'buffer'")
+				.get();
+			const buffer = typeof bufferRow?.cnt === "number" ? bufferRow.cnt : 0;
+
+			// Average strength
+			const avgRow = db.prepare("SELECT AVG(strength) as avg FROM memories").get();
+			const avgStrength = typeof avgRow?.avg === "number" ? avgRow.avg : 0;
+
+			db.close();
+			return { total, episodic, semantic, buffer, avgStrength };
+		} catch {
+			return { total: 0, episodic: 0, semantic: 0, buffer: 0, avgStrength: 0 };
+		}
+	}
+
+	/**
+	 * Find entries matching a pattern using SQL LIKE.
+	 * Returns up to `limit` candidates without loading all entries into memory.
+	 */
+	private findEntriesByPattern(root: string, pattern: string, limit: number): MemoryEntry[] {
+		try {
+			const nodeRequire = createRequire(import.meta.url);
+			const { DatabaseSync } = nodeRequire("node:sqlite") as {
+				DatabaseSync: new (
+					path: string,
+					options?: { open?: boolean },
+				) => {
+					prepare(sql: string): {
+						all(...params: unknown[]): { [key: string]: unknown }[];
+					};
+					close(): void;
+				};
+			};
+
+			const dbPath = join(root, "hippo.db");
+			const db = new DatabaseSync(dbPath, { open: true });
+
+			const escapeLike = (term: string) => term.replace(/[%_\\]/g, "\\$&");
+			const likePattern = `%${escapeLike(pattern)}%`;
+
+			// Use LOWER for case-insensitive matching on content and tags_json
+			const rows = db
+				.prepare(
+					`SELECT ${MEMORY_SELECT_COLUMNS} FROM memories
+					 WHERE (LOWER(content) LIKE LOWER(?) ESCAPE '\\' OR LOWER(tags_json) LIKE LOWER(?) ESCAPE '\\')
+					 LIMIT ?`,
+				)
+				.all(likePattern, likePattern, limit);
+
+			db.close();
+			return rows.map((row) => this.rowToMemoryEntry(row));
+		} catch {
+			return [];
+		}
+	}
+
+	/**
+	 * Convert a SQLite row to a MemoryEntry.
+	 * Duplicated from hippo-memory's internal rowToMemoryEntry for use in
+	 * findEntriesByPattern since hippo-memory doesn't export this helper.
+	 */
+	private rowToMemoryEntry(row: { [key: string]: unknown }): MemoryEntry {
+		return {
+			id: String(row.id),
+			created: String(row.created ?? new Date().toISOString()),
+			last_retrieved: String(row.last_retrieved ?? new Date().toISOString()),
+			retrieval_count: Number(row.retrieval_count ?? 0),
+			strength: Number(row.strength ?? 1.0),
+			half_life_days: Number(row.half_life_days ?? 7),
+			layer: row.layer as Layer,
+			tags: this.parseTagsJson(row.tags_json),
+			emotional_valence: (row.emotional_valence ?? "neutral") as MemoryEntry["emotional_valence"],
+			schema_fit: Number(row.schema_fit ?? 0.5),
+			source: String(row.source ?? "cli"),
+			outcome_score:
+				row.outcome_score === null || row.outcome_score === undefined
+					? null
+					: Number(row.outcome_score),
+			outcome_positive: Number(row.outcome_positive ?? 0),
+			outcome_negative: Number(row.outcome_negative ?? 0),
+			conflicts_with: this.parseJsonArray(row.conflicts_with_json),
+			pinned: Boolean(row.pinned ?? false),
+			confidence: (row.confidence ?? "observed") as MemoryEntry["confidence"],
+			content: String(row.content ?? ""),
+		};
+	}
+
+	private parseTagsJson(value: unknown): string[] {
+		if (typeof value !== "string" || value.length === 0) return [];
+		try {
+			const parsed = JSON.parse(value);
+			return Array.isArray(parsed) ? parsed.map(String) : [];
+		} catch {
+			return [];
+		}
+	}
+
+	private parseJsonArray(value: unknown): string[] {
+		if (value === null || value === undefined) return [];
+		if (typeof value !== "string") return [];
+		try {
+			const parsed = JSON.parse(value);
+			return Array.isArray(parsed) ? parsed.map(String) : [];
+		} catch {
+			return [];
 		}
 	}
 

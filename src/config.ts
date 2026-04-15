@@ -11,6 +11,7 @@ export interface HippoMemoryConfig {
 	recallBudget: number;
 	recallLimit: number;
 	sleepThreshold: number;
+	searchCandidateLimit: number;
 	searchMode: "bm25" | "hybrid";
 	framing: "observe" | "suggest" | "assert";
 	projectRoot?: string;
@@ -27,6 +28,7 @@ export const DEFAULT_CONFIG: HippoMemoryConfig = {
 	recallBudget: 1500,
 	recallLimit: 5,
 	sleepThreshold: 5,
+	searchCandidateLimit: 200,
 	searchMode: "hybrid",
 	framing: "observe",
 };
@@ -62,6 +64,7 @@ export function loadConfig({ cwd }: LoadConfigOptions): HippoMemoryConfig {
 	applyEnvInt(merged, "recallBudget", "HIPPO_MEMORY_RECALL_BUDGET");
 	applyEnvInt(merged, "recallLimit", "HIPPO_MEMORY_RECALL_LIMIT");
 	applyEnvInt(merged, "sleepThreshold", "HIPPO_MEMORY_SLEEP_THRESHOLD");
+	applyEnvInt(merged, "searchCandidateLimit", "HIPPO_MEMORY_SEARCH_CANDIDATE_LIMIT");
 	applyEnvEnum(merged, "searchMode", "HIPPO_MEMORY_SEARCH_MODE", ["bm25", "hybrid"]);
 	applyEnvEnum(merged, "framing", "HIPPO_MEMORY_FRAMING", ["observe", "suggest", "assert"]);
 	applyEnvString(merged, "projectRoot", "HIPPO_PROJECT_ROOT");
@@ -115,7 +118,12 @@ function sanitizeConfigFile(value: unknown): Partial<HippoMemoryConfig> {
 		if (typeof v === "boolean") out[k] = v;
 	}
 
-	const intKeys: readonly IntKey[] = ["recallBudget", "recallLimit", "sleepThreshold"];
+	const intKeys: readonly IntKey[] = [
+		"recallBudget",
+		"recallLimit",
+		"sleepThreshold",
+		"searchCandidateLimit",
+	];
 	for (const k of intKeys) {
 		const v = input[k];
 		if (typeof v === "number" && Number.isInteger(v) && v >= 0) out[k] = v;
