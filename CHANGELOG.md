@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.9](https://github.com/MonsieurBarti/hippo-memory-pi/compare/hippo-memory-pi-v0.1.8...hippo-memory-pi-v0.1.9) (2026-04-15)
+
+
+### Features
+
+* make update checks non-blocking ([997a70d](https://github.com/MonsieurBarti/hippo-memory-pi/commit/997a70da42ec505a47ce884169353c11dc938b4d))
+* make update checks non-blocking ([50d0780](https://github.com/MonsieurBarti/hippo-memory-pi/commit/50d0780da9fd280ea1893abd1d561b69446b7ffd))
+
 ## [0.1.8](https://github.com/MonsieurBarti/hippo-memory-pi/compare/hippo-memory-pi-v0.1.7...hippo-memory-pi-v0.1.8) (2026-04-15)
 
 
