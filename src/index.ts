@@ -272,14 +272,15 @@ export default function hippoMemoryExtension(pi: PiExtensionApi): void {
 			(globalThis as Record<symbol, unknown>)[REGISTRY_KEY] = service;
 		}
 
-		// Check for extension updates
-		const updateInfo = await checkForUpdates(pi);
-		if (updateInfo?.updateAvailable) {
-			notify(
-				`📦 Update available: ${updateInfo.latestVersion} (you have ${updateInfo.currentVersion}). Run: pi install npm:@the-forge-flow/hippo-memory-pi`,
-				"info",
-			);
-		}
+		// Check for extension updates (non-blocking)
+		void checkForUpdates(pi).then((info) => {
+			if (info?.updateAvailable) {
+				notify(
+					`📦 Update available: ${info.latestVersion} (you have ${info.currentVersion}). Run: pi install npm:@the-forge-flow/hippo-memory-pi`,
+					"info",
+				);
+			}
+		});
 	});
 
 	pi.on("session_shutdown", async (event, ctx) => {
