@@ -6,7 +6,7 @@
       "name": "@the-forge-flow/tff",
       "dependencies": {
         "@huggingface/transformers": "^3.0.0",
-        "hippo-memory": "^0.19.0",
+        "hippo-memory": "^0.23.0",
       },
       "devDependencies": {
         "@biomejs/biome": "^1.9.4",
@@ -759,7 +759,7 @@
 
     "highlight.js": ["highlight.js@10.7.3", "", {}, "sha512-tzcUFauisWKNHaRkN4Wjl/ZA07gENAjFl3J/c480dprkGTg5EQstgaNFqBfUqCq54kZRIEcreTsAgF/m2quD7A=="],
 
-    "hippo-memory": ["hippo-memory@0.19.0", "", { "optionalDependencies": { "@xenova/transformers": "^2.17.2" }, "bin": { "hippo": "bin/hippo.js" } }, "sha512-3jX/woMiELr8PQVzESrOSgpxFtBjE6q6Xqs4PFnfmxzCIHbCeBbTGlv7vTMOaTK9r4SsSbklpVwhyLk7LJWSgQ=="],
+    "hippo-memory": ["hippo-memory@0.23.0", "", { "optionalDependencies": { "@xenova/transformers": "^2.17.2" }, "bin": { "hippo": "bin/hippo.js" } }, "sha512-SOSjG1aHJICAlL4WgKkXrstfoBFlqg/htDkGwNQUxZJlLxSpk7JGy7qTiAfyAO1RKi4X+oN2RBXwI5Q3meYXaQ=="],
 
     "hosted-git-info": ["hosted-git-info@9.0.2", "", { "dependencies": { "lru-cache": "^11.1.0" } }, "sha512-M422h7o/BR3rmCQ8UHi7cyyMqKltdP9Uo+J2fXK+RSAY+wTcKOIRyhTuKv4qn+DJf3g+PL890AzId5KZpX+CBg=="],
 
