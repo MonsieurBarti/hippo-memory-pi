@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.8](https://github.com/MonsieurBarti/hippo-memory-pi/compare/hippo-memory-pi-v0.1.7...hippo-memory-pi-v0.1.8) (2026-04-15)
+
+
+### Performance Improvements
+
+* use indexed sqlite queries for large memory stores ([644536f](https://github.com/MonsieurBarti/hippo-memory-pi/commit/644536fbc164f7d65cccd407d5703b1dffb9f4f4))
+* use indexed sqlite queries for large memory stores ([4856cb2](https://github.com/MonsieurBarti/hippo-memory-pi/commit/4856cb22c529856986fef2582a9fe7864f0bb59a))
+
 ## [0.1.7](https://github.com/MonsieurBarti/hippo-memory-pi/compare/hippo-memory-pi-v0.1.6...hippo-memory-pi-v0.1.7) (2026-04-12)
 
 
